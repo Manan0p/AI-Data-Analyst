@@ -1,0 +1,1 @@
+import {create} from 'zustand';import {Dataset} from '@/types';export const useWorkspace=create<{dataset?:Dataset;setDataset:(d?:Dataset)=>void}>(set=>({dataset:undefined,setDataset:dataset=>set({dataset})}));
