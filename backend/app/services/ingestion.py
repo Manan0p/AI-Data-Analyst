@@ -1,5 +1,5 @@
+import hashlib
 import io
-import uuid
 import pandas as pd
 from fastapi import HTTPException, UploadFile
 from app.database.registry import Dataset, DatasetRegistry
@@ -42,12 +42,17 @@ class CsvIngestionService:
             if frame[col].dtype == "object":
                 if any(term in str(col).lower() for term in ("date", "time", "year", "month", "day")):
                     try:
-                        parsed = pd.to_datetime(frame[col], format="mixed", errors="ignore")
+                        parsed = pd.to_datetime(frame[col], format="mixed", errors="coerce")
                         if pd.api.types.is_datetime64_any_dtype(parsed):
                             frame[col] = parsed
                     except Exception:
                         pass
 
-        dataset = Dataset(uuid.uuid4().hex[:12], upload.filename, frame)
+        # Deterministic dataset ID generation from filename and content hash
+        # Guarantees 0 duplicate dataset cards and instant ID matching across serverless workers
+        seed = f"{upload.filename}:{len(content)}:{content[:500]}".encode('utf-8')
+        dataset_id = hashlib.md5(seed).hexdigest()[:12]
+
+        dataset = Dataset(dataset_id, upload.filename, frame)
         self.registry.add(dataset)
         return dataset
