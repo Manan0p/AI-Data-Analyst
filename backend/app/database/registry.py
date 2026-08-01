@@ -27,6 +27,13 @@ class DatasetRegistry:
                 raise KeyError(f"Dataset '{dataset_id}' was not found")
             return self._items[dataset_id]
 
+    def delete(self, dataset_id: str) -> bool:
+        with self._lock:
+            if dataset_id in self._items:
+                del self._items[dataset_id]
+                return True
+            return False
+
     def list(self) -> list[Dataset]:
         with self._lock:
             return list(self._items.values())

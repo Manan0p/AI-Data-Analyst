@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 
 export default function DashboardPage() {
+  const queryClient = useQueryClient();
   const { data: datasets, isLoading } = useQuery({ queryKey: ['datasets'], queryFn: api.datasets });
 
   const totalRows = datasets?.reduce((s, d) => s + d.rows, 0) ?? 0;
@@ -15,6 +16,20 @@ export default function DashboardPage() {
     { label: 'Total Rows', value: totalRows.toLocaleString(), icon: '≡', color: 'var(--accent-violet)' },
     { label: 'Total Columns', value: totalCols, icon: '⊞', color: 'var(--accent-emerald)' },
   ];
+
+  async function handleDelete(id: string) {
+    try {
+      await api.deleteDataset(id);
+      queryClient.invalidateQueries({ queryKey: ['datasets'] });
+    } catch {}
+  }
+
+  async function handleClearAll() {
+    try {
+      await api.deleteAllDatasets();
+      queryClient.invalidateQueries({ queryKey: ['datasets'] });
+    } catch {}
+  }
 
   return (
     <div className="page-enter p-8 max-w-7xl mx-auto">
@@ -38,12 +53,22 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Datasets */}
+      {/* Datasets Header */}
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">Your Datasets</h2>
-        <Link href="/datasets" className="btn-ghost text-sm">
-          Upload new →
-        </Link>
+        <div className="flex gap-3">
+          {datasets && datasets.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              className="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg border border-rose-900/40 hover:border-rose-700/60 transition-all"
+            >
+              Clear All
+            </button>
+          )}
+          <Link href="/datasets" className="btn-ghost text-sm">
+            Upload new →
+          </Link>
+        </div>
       </div>
 
       {!datasets || datasets.length === 0 ? (
@@ -56,16 +81,25 @@ export default function DashboardPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {datasets.map(d => (
-            <div key={d.id} className="card-hover group">
+            <div key={d.id} className="card-hover group relative">
+              {/* Delete Icon */}
+              <button
+                onClick={() => handleDelete(d.id)}
+                title="Delete dataset"
+                className="absolute top-4 right-4 text-xs opacity-40 group-hover:opacity-100 text-rose-400 hover:text-rose-300 transition-all p-1.5 rounded-lg hover:bg-rose-950/40"
+              >
+                ✕
+              </button>
+
               {/* Header */}
-              <div className="mb-4 flex items-start justify-between">
+              <div className="mb-4 flex items-start justify-between pr-8">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.2)' }}>
                   <span style={{ color: 'var(--accent-cyan)' }}>◈</span>
                 </div>
                 <span className="badge badge-cyan">CSV</span>
               </div>
 
-              <h3 className="font-semibold text-white truncate">{d.name.replace(/\.csv$/i, '')}</h3>
+              <h3 className="font-semibold text-white truncate pr-4">{d.name.replace(/\.csv$/i, '')}</h3>
               <p className="muted mt-1">{d.rows.toLocaleString()} rows · {d.columns} columns</p>
 
               {/* Actions */}

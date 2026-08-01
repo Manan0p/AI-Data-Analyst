@@ -20,6 +20,10 @@ export const api = {
     return request<Dataset[]>('/upload', { method: 'POST', body });
   },
 
+  deleteDataset: (id: string) => request<{ message: string }>(`/datasets/${id}`, { method: 'DELETE' }),
+
+  deleteAllDatasets: () => request<{ message: string }>('/datasets', { method: 'DELETE' }),
+
   profile: (id: string) => request<Profile>(`/datasets/${id}/profile`),
 
   rows: (id: string, search = '') =>
