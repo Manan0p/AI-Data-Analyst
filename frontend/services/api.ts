@@ -61,7 +61,8 @@ export const api = {
         list = await request<Dataset[]>('/datasets');
       }
     }
-    return list;
+    // Deduplicate datasets by ID
+    return Array.from(new Map(list.map(d => [d.id, d])).values());
   },
 
   upload: async (files: File[]) => {
@@ -82,7 +83,7 @@ export const api = {
       }
     }
 
-    return result;
+    return Array.from(new Map(result.map(d => [d.id, d])).values());
   },
 
   profile: (id: string) => request<Profile>(`/datasets/${id}/profile`),
