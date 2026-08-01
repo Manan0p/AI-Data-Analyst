@@ -200,6 +200,24 @@ class GeminiPlannerAgent(PlannerAgent):
         )
         return json.loads(response.text)
 
+    @staticmethod
+    def _parse_confidence(val: object) -> float:
+        if isinstance(val, (int, float)):
+            return min(1.0, max(0.0, float(val)))
+        if isinstance(val, str):
+            v = val.strip().lower()
+            if v in ("high", "very high"):
+                return 0.95
+            if v in ("medium", "med"):
+                return 0.80
+            if v in ("low", "very low"):
+                return 0.60
+            try:
+                return min(1.0, max(0.0, float(v)))
+            except ValueError:
+                return 0.85
+        return 0.85
+
     def respond_with_context(
         self,
         primary_id: str,
@@ -225,7 +243,7 @@ class GeminiPlannerAgent(PlannerAgent):
             base = dict(
                 answer=str(plan.get("answer") or "Analysis completed."),
                 reasoning=str(plan.get("reasoning") or f"Gemini selected the {tool} tool."),
-                confidence=min(1.0, max(0.0, float(plan.get("confidence", 0.8)))),
+                confidence=self._parse_confidence(plan.get("confidence", 0.8)),
                 assumptions=self._list(plan.get("assumptions")),
                 limitations=self._list(plan.get("limitations")),
             )

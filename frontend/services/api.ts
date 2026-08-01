@@ -3,9 +3,16 @@ import { datasetStore } from './storage';
 
 const base = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '/api' : 'http://localhost:8000/api');
 
-async function rehydrateDataset(dataset_id: string): Promise<boolean> {
-  const stored = await datasetStore.get(dataset_id);
-  if (!stored) return false;
+async function rehydrateDataset(dataset_id: string | null): Promise<boolean> {
+  let stored = dataset_id ? await datasetStore.get(dataset_id) : null;
+  
+  // Fallback: If exact ID not found, re-upload all stored client datasets
+  if (!stored) {
+    const allStored = await datasetStore.getAll();
+    if (allStored.length === 0) return false;
+    stored = allStored[0];
+  }
+
   try {
     const file = new File([stored.csvContent], stored.name, { type: 'text/csv' });
     const formData = new FormData();
@@ -17,6 +24,32 @@ async function rehydrateDataset(dataset_id: string): Promise<boolean> {
   }
 }
 
+function extractDatasetId(path: string, init?: RequestInit, errorMsg?: string): string | null {
+  // 1. Check URL path for /datasets/:id
+  const matchPath = path.match(/datasets\/([a-zA-Z0-9_-]+)/);
+  if (matchPath) return matchPath[1];
+
+  // 2. Check query string for ?dataset_id=:id or &dataset_id=:id
+  const matchQuery = path.match(/[?&]dataset_id=([a-zA-Z0-9_-]+)/);
+  if (matchQuery) return matchQuery[1];
+
+  // 3. Check JSON request body
+  if (init?.body) {
+    try {
+      const parsed = JSON.parse(String(init.body));
+      if (parsed.dataset_id) return String(parsed.dataset_id);
+    } catch {}
+  }
+
+  // 4. Extract dataset_id from backend error message (e.g. "Dataset '47476cc84f68' was not found")
+  if (errorMsg) {
+    const matchError = errorMsg.match(/Dataset ['"]?([a-zA-Z0-9_-]+)['"]? was not found/i);
+    if (matchError) return matchError[1];
+  }
+
+  return null;
+}
+
 async function request<T>(path: string, init?: RequestInit, isRetry = false): Promise<T> {
   const r = await fetch(base + path, init);
   if (!r.ok) {
@@ -24,23 +57,11 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
     const errorMsg = String(body.detail ?? r.statusText);
 
     // If dataset was lost due to Vercel Serverless cold-start, auto-rehydrate from client storage
-    if ((r.status === 404 || errorMsg.includes('not found')) && !isRetry) {
-      // Extract dataset_id from path or request body if available
-      const match = path.match(/datasets\/([a-zA-Z0-9_-]+)/);
-      let dataset_id = match ? match[1] : null;
-
-      if (!dataset_id && init?.body) {
-        try {
-          const parsed = JSON.parse(String(init.body));
-          dataset_id = parsed.dataset_id;
-        } catch {}
-      }
-
-      if (dataset_id) {
-        const ok = await rehydrateDataset(dataset_id);
-        if (ok) {
-          return request<T>(path, init, true);
-        }
+    if ((r.status === 404 || r.status === 400 || errorMsg.includes('not found')) && !isRetry) {
+      const dataset_id = extractDatasetId(path, init, errorMsg);
+      const ok = await rehydrateDataset(dataset_id);
+      if (ok) {
+        return request<T>(path, init, true);
       }
     }
 
