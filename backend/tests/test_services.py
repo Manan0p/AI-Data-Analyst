@@ -7,6 +7,7 @@ from app.services.ingestion import CsvIngestionService
 
 def test_csv_ingestion_success():
     registry = DatasetRegistry()
+    registry.clear()
     service = CsvIngestionService(registry)
     
     content = b"region,sales,quantity\nNorth,100,5\nSouth,200,10\n"
@@ -20,6 +21,7 @@ def test_csv_ingestion_success():
 
 def test_csv_ingestion_non_csv():
     registry = DatasetRegistry()
+    registry.clear()
     service = CsvIngestionService(registry)
     
     upload_file = UploadFile(filename="test.txt", file=io.BytesIO(b"hello world"))
@@ -30,6 +32,7 @@ def test_csv_ingestion_non_csv():
 
 def test_csv_ingestion_empty_file():
     registry = DatasetRegistry()
+    registry.clear()
     service = CsvIngestionService(registry)
     
     upload_file = UploadFile(filename="empty.csv", file=io.BytesIO(b""))
