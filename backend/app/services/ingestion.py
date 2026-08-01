@@ -1,5 +1,5 @@
-import hashlib
 import io
+import uuid
 import pandas as pd
 from fastapi import HTTPException, UploadFile
 from app.database.registry import Dataset, DatasetRegistry
@@ -48,11 +48,6 @@ class CsvIngestionService:
                     except Exception:
                         pass
 
-        # Generate a deterministic dataset ID from filename and content hash
-        # Ensures re-uploading/re-hydrating the same CSV produces the exact same dataset ID
-        seed = f"{upload.filename}:{len(content)}:{content[:500]}".encode('utf-8')
-        dataset_id = hashlib.md5(seed).hexdigest()[:12]
-
-        dataset = Dataset(dataset_id, upload.filename, frame)
+        dataset = Dataset(uuid.uuid4().hex[:12], upload.filename, frame)
         self.registry.add(dataset)
         return dataset

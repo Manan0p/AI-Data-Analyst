@@ -12,13 +12,10 @@ const NAV = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { data: rawDatasets } = useQuery({ queryKey: ['datasets'], queryFn: api.datasets });
+  const { data: datasets } = useQuery({ queryKey: ['datasets'], queryFn: api.datasets });
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname?.startsWith(href) ?? false;
-
-  // Deduplicate datasets by ID
-  const datasets = rawDatasets ? Array.from(new Map(rawDatasets.map(d => [d.id, d])).values()) : [];
 
   return (
     <aside className="sidebar">
