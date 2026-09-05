@@ -8,7 +8,8 @@ class SqlTool:
 
     _ALLOWED_PATTERN = re.compile(r"^\s*select\b", re.IGNORECASE)
     _FORBIDDEN_KEYWORDS = re.compile(
-        r"\b(insert|update|delete|drop|create|alter|truncate|copy|attach|detach|load|install|call|pragma)\b",
+        r"\b(insert|update|delete|drop|create|alter|truncate|copy|attach|detach|load|install|call|pragma|"
+        r"read_csv|read_csv_auto|read_parquet|read_json|read_json_auto|scan_parquet|scan_csv|parquet_scan|glob)\b",
         re.IGNORECASE,
     )
 
@@ -35,9 +36,11 @@ class SqlTool:
         query = self._clean(query)
         self._validate(query)
 
-        # Use a fresh per-request connection to avoid stale table registrations
-        con = duckdb.connect(":memory:")
+        # Use a fresh per-request connection with disabled external access and resource limits
+        con = duckdb.connect(":memory:", config={"enable_external_access": False})
         try:
+            con.execute("SET memory_limit='256MB'")
+            con.execute("SET max_temp_directory_size='256MB'")
             for table_name, frame in datasets.items():
                 con.register(table_name, frame)
             result_df = con.execute(query).df()
