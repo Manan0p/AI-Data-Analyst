@@ -9,12 +9,11 @@ class CsvIngestionService:
     def __init__(self, registry: DatasetRegistry):
         self.registry = registry
 
-    async def ingest(self, upload: UploadFile, owner_id: str | None = None) -> Dataset:
-        if not upload.filename or not upload.filename.lower().endswith(".csv"):
+    def ingest_bytes(self, filename: str, content: bytes, owner_id: str | None = None) -> Dataset:
+        if not filename or not filename.lower().endswith(".csv"):
             raise HTTPException(400, "Only CSV files are supported")
-        content = await upload.read()
         if not content.strip():
-            raise HTTPException(400, f"{upload.filename} is empty")
+            raise HTTPException(400, f"{filename} is empty")
 
         decoded = None
         for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
@@ -50,9 +49,13 @@ class CsvIngestionService:
 
         # Deterministic dataset ID generation from filename and content hash
         # Guarantees 0 duplicate dataset cards and instant ID matching across serverless workers
-        seed = f"{upload.filename}:{len(content)}:{content[:500]}".encode('utf-8')
+        seed = f"{filename}:{len(content)}:{content[:500]}".encode('utf-8')
         dataset_id = hashlib.md5(seed).hexdigest()[:12]
 
-        dataset = Dataset(dataset_id, upload.filename, frame, owner_id=owner_id)
+        dataset = Dataset(dataset_id, filename, frame, owner_id=owner_id)
         self.registry.add(dataset, owner_id=owner_id)
         return dataset
+
+    async def ingest(self, upload: UploadFile, owner_id: str | None = None) -> Dataset:
+        content = await upload.read()
+        return self.ingest_bytes(upload.filename or "upload.csv", content, owner_id=owner_id)

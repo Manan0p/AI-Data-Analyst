@@ -26,3 +26,11 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
 
+class JobResponse(BaseModel):
+    job_id: str
+    job_type: str
+    status: str
+    result: Any | None = None
+    error: str | None = None
+
+

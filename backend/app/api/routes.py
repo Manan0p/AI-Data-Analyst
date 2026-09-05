@@ -9,7 +9,9 @@ from app.memory.session import memory
 from app.schemas.contracts import *
 from app.services.auth import get_current_user
 from app.services.ingestion import CsvIngestionService
+from app.services.jobs import job_manager
 from app.tools.pandas_tool import PandasTool
+
 from app.tools.sql_tool import sql_tool
 
 router = APIRouter()
@@ -39,6 +41,40 @@ async def upload(
     current_user: str = Depends(get_current_user)
 ):
     return [summary(await ingestion.ingest(f, owner_id=current_user)) for f in files]
+
+@router.post('/upload/async', response_model=JobResponse, status_code=202)
+async def upload_async(
+    files: list[UploadFile] = File(...),
+    current_user: str = Depends(get_current_user)
+):
+    file_payloads = []
+    for f in files:
+        content = await f.read()
+        file_payloads.append((f.filename or "upload.csv", content))
+
+    def _task():
+        results = []
+        for fname, content in file_payloads:
+            ds = ingestion.ingest_bytes(fname, content, owner_id=current_user)
+            results.append(summary(ds).model_dump())
+        return results
+
+    job_id = job_manager.submit_job("csv_ingestion", current_user, _task)
+    return JobResponse(job_id=job_id, job_type="csv_ingestion", status="processing")
+
+@router.get('/jobs/{job_id}', response_model=JobResponse)
+def get_job(job_id: str, current_user: str = Depends(get_current_user)):
+    job = job_manager.get_job(job_id, user_id=current_user)
+    if not job:
+        raise HTTPException(404, f"Job '{job_id}' not found")
+    return JobResponse(
+        job_id=job.id,
+        job_type=job.job_type,
+        status=job.status.value,
+        result=job.result,
+        error=job.error,
+    )
+
 
 @router.get('/datasets', response_model=list[DatasetSummary])
 def datasets(current_user: str = Depends(get_current_user)):
@@ -135,4 +171,16 @@ def anomalies(dataset_id: str, current_user: str = Depends(get_current_user)):
         limitations=['Not suitable for categorical-only datasets.'],
         metadata={'tool': 'anomaly'}
     )
+
+@router.post('/detect-anomalies/async', response_model=JobResponse, status_code=202)
+def anomalies_async(dataset_id: str, current_user: str = Depends(get_current_user)):
+    d = get_dataset(dataset_id, owner_id=current_user)
+    frame = d.frame.copy()
+
+    def _task():
+        return AnomalyService().detect(frame)
+
+    job_id = job_manager.submit_job("anomaly_detection", current_user, _task)
+    return JobResponse(job_id=job_id, job_type="anomaly_detection", status="processing")
+
 
