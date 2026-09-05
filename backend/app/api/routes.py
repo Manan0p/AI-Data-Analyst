@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from app.agents.planner import GeminiPlannerAgent
 from app.analytics.anomalies import AnomalyService
 from app.analytics.profiler import ProfileService
@@ -7,6 +7,7 @@ from app.charts.factory import ChartFactory
 from app.database.registry import registry
 from app.memory.session import memory
 from app.schemas.contracts import *
+from app.services.auth import get_current_user
 from app.services.ingestion import CsvIngestionService
 from app.tools.pandas_tool import PandasTool
 from app.tools.sql_tool import sql_tool
@@ -17,9 +18,9 @@ profiler = ProfileService()
 planner = GeminiPlannerAgent()
 logger = logging.getLogger(__name__)
 
-def get_dataset(dataset_id):
+def get_dataset(dataset_id: str, owner_id: str | None = None):
     try:
-        return registry.get(dataset_id)
+        return registry.get(dataset_id, owner_id=owner_id)
     except KeyError as exc:
         raise HTTPException(404, str(exc)) from exc
 
@@ -33,32 +34,35 @@ def summary(d):
     )
 
 @router.post('/upload', response_model=list[DatasetSummary])
-async def upload(files: list[UploadFile] = File(...)):
-    return [summary(await ingestion.ingest(f)) for f in files]
+async def upload(
+    files: list[UploadFile] = File(...),
+    current_user: str = Depends(get_current_user)
+):
+    return [summary(await ingestion.ingest(f, owner_id=current_user)) for f in files]
 
 @router.get('/datasets', response_model=list[DatasetSummary])
-def datasets():
-    return [summary(d) for d in registry.list()]
+def datasets(current_user: str = Depends(get_current_user)):
+    return [summary(d) for d in registry.list(owner_id=current_user)]
 
 @router.delete('/datasets/{dataset_id}')
-def delete_dataset(dataset_id: str):
-    if not registry.delete(dataset_id):
+def delete_dataset(dataset_id: str, current_user: str = Depends(get_current_user)):
+    if not registry.delete(dataset_id, owner_id=current_user):
         raise HTTPException(404, f"Dataset '{dataset_id}' not found")
     return {"message": "Dataset deleted"}
 
 @router.delete('/datasets')
-def delete_all_datasets():
-    registry.clear()
-    return {"message": "All datasets cleared"}
+def delete_all_datasets(current_user: str = Depends(get_current_user)):
+    registry.clear(owner_id=current_user)
+    return {"message": "All user datasets cleared"}
 
 @router.get('/datasets/{dataset_id}/profile', response_model=ProfileResponse)
-def profile(dataset_id: str):
-    d = get_dataset(dataset_id)
+def profile(dataset_id: str, current_user: str = Depends(get_current_user)):
+    d = get_dataset(dataset_id, owner_id=current_user)
     return profiler.profile(d.id, d.frame)
 
 @router.get('/datasets/{dataset_id}/rows')
-def rows(dataset_id: str, offset: int = 0, limit: int = 50, search: str = ''):
-    d = get_dataset(dataset_id)
+def rows(dataset_id: str, offset: int = 0, limit: int = 50, search: str = '', current_user: str = Depends(get_current_user)):
+    d = get_dataset(dataset_id, owner_id=current_user)
     frame = d.frame
     if search:
         frame = frame[frame.astype(str).apply(lambda c: c.str.contains(search, case=False, na=False)).any(axis=1)]
@@ -69,19 +73,20 @@ def rows(dataset_id: str, offset: int = 0, limit: int = 50, search: str = ''):
     }
 
 @router.post('/chat', response_model=AnalysisResponse)
-def chat(request: ChatRequest):
-    d = get_dataset(request.dataset_id)
+def chat(request: ChatRequest, current_user: str = Depends(get_current_user)):
+    d = get_dataset(request.dataset_id, owner_id=current_user)
     memory.add(request.session_id, 'user', request.message)
-    all_data = {registry.table_name(i.id): i.frame for i in registry.list()}
+    all_data = {registry.table_name(i.id): i.frame for i in registry.list(owner_id=current_user)}
     response = planner.respond_with_context(d.id, all_data, request.message, memory.get(request.session_id))
     memory.add(request.session_id, 'assistant', response.answer)
     return response
 
 @router.post('/generate-sql', response_model=AnalysisResponse)
-def sql(request: SqlRequest):
-    get_dataset(request.dataset_id)
+def sql(request: SqlRequest, current_user: str = Depends(get_current_user)):
+    get_dataset(request.dataset_id, owner_id=current_user)
     try:
-        query, result = sql_tool.run({registry.table_name(i.id): i.frame for i in registry.list()}, request.query)
+        user_tables = {registry.table_name(i.id): i.frame for i in registry.list(owner_id=current_user)}
+        query, result = sql_tool.run(user_tables, request.query)
         return AnalysisResponse(
             answer=f'Returned {len(result)} rows.',
             reasoning='Executed validated read-only SQL in DuckDB.',
@@ -93,9 +98,9 @@ def sql(request: SqlRequest):
         raise HTTPException(400, str(exc)) from exc
 
 @router.post('/generate-pandas', response_model=AnalysisResponse)
-def pandas(request: PandasRequest):
+def pandas(request: PandasRequest, current_user: str = Depends(get_current_user)):
     try:
-        result = PandasTool().run(get_dataset(request.dataset_id).frame, request.code)
+        result = PandasTool().run(get_dataset(request.dataset_id, owner_id=current_user).frame, request.code)
         return AnalysisResponse(
             answer=f'Returned {len(result)} rows.',
             reasoning='Executed a parsed restricted Pandas expression.',
@@ -107,21 +112,21 @@ def pandas(request: PandasRequest):
         raise HTTPException(400, str(exc)) from exc
 
 @router.post('/generate-chart', response_model=AnalysisResponse)
-def chart(request: ChartRequest):
+def chart(request: ChartRequest, current_user: str = Depends(get_current_user)):
     try:
         return AnalysisResponse(
             answer='Chart generated.',
             reasoning='Validated requested fields and produced a Plotly specification.',
             confidence=.97,
-            chart=ChartFactory().create(get_dataset(request.dataset_id).frame, request.chart_type, request.x, request.y),
+            chart=ChartFactory().create(get_dataset(request.dataset_id, owner_id=current_user).frame, request.chart_type, request.x, request.y),
             metadata={'tool': 'visualization'}
         )
     except Exception as exc:
         raise HTTPException(400, str(exc)) from exc
 
 @router.post('/detect-anomalies', response_model=AnalysisResponse)
-def anomalies(dataset_id: str):
-    items = AnomalyService().detect(get_dataset(dataset_id).frame)
+def anomalies(dataset_id: str, current_user: str = Depends(get_current_user)):
+    items = AnomalyService().detect(get_dataset(dataset_id, owner_id=current_user).frame)
     return AnalysisResponse(
         answer=f'Found {len(items)} potential anomalies.',
         reasoning='Isolation Forest scores numeric outliers.',
@@ -130,3 +135,4 @@ def anomalies(dataset_id: str):
         limitations=['Not suitable for categorical-only datasets.'],
         metadata={'tool': 'anomaly'}
     )
+

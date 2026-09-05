@@ -9,5 +9,10 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
     upload_dir: Path = Path("data/uploads")
     max_upload_mb: int = 25
+    database_url: str = "sqlite:///./insightforge.db"
+    jwt_secret: str = "insightforge-insecure-dev-secret-replace-in-production"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24
 
 settings = Settings()
+

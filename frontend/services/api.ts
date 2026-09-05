@@ -3,6 +3,44 @@ import { sessionStore } from './sessionStore';
 
 const base = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '/api' : 'http://localhost:8000/api');
 
+const TOKEN_KEY = 'insightforge_token';
+const USER_KEY = 'insightforge_user';
+
+export interface User {
+  id: string;
+  email: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+export const authStorage = {
+  getToken: (): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(TOKEN_KEY);
+  },
+  setToken: (token: string) => {
+    if (typeof window !== 'undefined') localStorage.setItem(TOKEN_KEY, token);
+  },
+  getUser: (): User | null => {
+    if (typeof window === 'undefined') return null;
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  },
+  setUser: (user: User) => {
+    if (typeof window !== 'undefined') localStorage.setItem(USER_KEY, JSON.stringify(user));
+  },
+  clear: () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+    }
+  },
+};
+
 async function rehydrateDataset(dataset_id: string | null): Promise<boolean> {
   let stored = dataset_id ? sessionStore.get(dataset_id) : null;
   if (!stored) {
@@ -15,7 +53,10 @@ async function rehydrateDataset(dataset_id: string | null): Promise<boolean> {
     const file = new File([stored.csvContent], stored.name, { type: 'text/csv' });
     const formData = new FormData();
     formData.append('files', file);
-    const res = await fetch(base + '/upload', { method: 'POST', body: formData });
+    const headers: Record<string, string> = {};
+    const token = authStorage.getToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(base + '/upload', { method: 'POST', body: formData, headers });
     return res.ok;
   } catch {
     return false;
@@ -45,17 +86,28 @@ function extractDatasetId(path: string, init?: RequestInit, errorMsg?: string): 
 }
 
 async function request<T>(path: string, init?: RequestInit, isRetry = false): Promise<T> {
-  const r = await fetch(base + path, init);
+  const token = authStorage.getToken();
+  const headers = new Headers(init?.headers || {});
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const mergedInit: RequestInit = {
+    ...init,
+    headers,
+  };
+
+  const r = await fetch(base + path, mergedInit);
   if (!r.ok) {
     const body = await r.json().catch(() => ({ detail: r.statusText }));
     const errorMsg = String(body.detail ?? r.statusText);
 
     // Re-seed stateless Vercel Serverless Lambda worker seamlessly if dataset was purged
     if ((r.status === 404 || r.status === 400 || errorMsg.includes('not found')) && !isRetry) {
-      const dataset_id = extractDatasetId(path, init, errorMsg);
+      const dataset_id = extractDatasetId(path, mergedInit, errorMsg);
       const ok = await rehydrateDataset(dataset_id);
       if (ok) {
-        return request<T>(path, init, true);
+        return request<T>(path, mergedInit, true);
       }
     }
 
@@ -139,4 +191,32 @@ export const api = {
 
   detectAnomalies: (dataset_id: string) =>
     request<Analysis>(`/detect-anomalies?dataset_id=${dataset_id}`, { method: 'POST' }),
+
+  register: async (email: string, password: string) => {
+    const res = await request<AuthResponse>('/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    authStorage.setToken(res.access_token);
+    authStorage.setUser(res.user);
+    return res;
+  },
+
+  login: async (email: string, password: string) => {
+    const res = await request<AuthResponse>('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    authStorage.setToken(res.access_token);
+    authStorage.setUser(res.user);
+    return res;
+  },
+
+  logout: () => {
+    authStorage.clear();
+  },
+
+  me: () => request<User>('/auth/me'),
 };

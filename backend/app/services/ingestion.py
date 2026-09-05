@@ -9,7 +9,7 @@ class CsvIngestionService:
     def __init__(self, registry: DatasetRegistry):
         self.registry = registry
 
-    async def ingest(self, upload: UploadFile) -> Dataset:
+    async def ingest(self, upload: UploadFile, owner_id: str | None = None) -> Dataset:
         if not upload.filename or not upload.filename.lower().endswith(".csv"):
             raise HTTPException(400, "Only CSV files are supported")
         content = await upload.read()
@@ -53,6 +53,6 @@ class CsvIngestionService:
         seed = f"{upload.filename}:{len(content)}:{content[:500]}".encode('utf-8')
         dataset_id = hashlib.md5(seed).hexdigest()[:12]
 
-        dataset = Dataset(dataset_id, upload.filename, frame)
-        self.registry.add(dataset)
+        dataset = Dataset(dataset_id, upload.filename, frame, owner_id=owner_id)
+        self.registry.add(dataset, owner_id=owner_id)
         return dataset

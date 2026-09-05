@@ -8,3 +8,21 @@ class ChatRequest(BaseModel): dataset_id: str; message: str = Field(min_length=1
 class SqlRequest(BaseModel): dataset_id: str; query: str
 class ChartRequest(BaseModel): dataset_id: str; chart_type: str; x: str; y: str | None = None
 class PandasRequest(BaseModel): dataset_id: str; code: str
+
+class UserRegister(BaseModel):
+    email: str
+    password: str = Field(min_length=6)
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
