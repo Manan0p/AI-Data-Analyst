@@ -1,9 +1,10 @@
 import logging
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from app.agents.planner import GeminiPlannerAgent
 from app.analytics.anomalies import AnomalyService
 from app.analytics.profiler import ProfileService
 from app.charts.factory import ChartFactory
+from app.core.limiter import limiter
 from app.database.registry import registry
 from app.memory.session import memory
 from app.schemas.contracts import *
@@ -11,7 +12,6 @@ from app.services.auth import get_current_user
 from app.services.ingestion import CsvIngestionService
 from app.services.jobs import job_manager
 from app.tools.pandas_tool import PandasTool
-
 from app.tools.sql_tool import sql_tool
 
 router = APIRouter()
@@ -36,14 +36,18 @@ def summary(d):
     )
 
 @router.post('/upload', response_model=list[DatasetSummary])
+@limiter.limit("10/minute")
 async def upload(
+    request: Request,
     files: list[UploadFile] = File(...),
     current_user: str = Depends(get_current_user)
 ):
     return [summary(await ingestion.ingest(f, owner_id=current_user)) for f in files]
 
 @router.post('/upload/async', response_model=JobResponse, status_code=202)
+@limiter.limit("10/minute")
 async def upload_async(
+    request: Request,
     files: list[UploadFile] = File(...),
     current_user: str = Depends(get_current_user)
 ):
@@ -109,12 +113,17 @@ def rows(dataset_id: str, offset: int = 0, limit: int = 50, search: str = '', cu
     }
 
 @router.post('/chat', response_model=AnalysisResponse)
-def chat(request: ChatRequest, current_user: str = Depends(get_current_user)):
-    d = get_dataset(request.dataset_id, owner_id=current_user)
-    memory.add(request.session_id, 'user', request.message)
+@limiter.limit("30/minute")
+def chat(
+    request: Request,
+    body: ChatRequest,
+    current_user: str = Depends(get_current_user)
+):
+    d = get_dataset(body.dataset_id, owner_id=current_user)
+    memory.add(body.session_id, 'user', body.message)
     all_data = {registry.table_name(i.id): i.frame for i in registry.list(owner_id=current_user)}
-    response = planner.respond_with_context(d.id, all_data, request.message, memory.get(request.session_id))
-    memory.add(request.session_id, 'assistant', response.answer)
+    response = planner.respond_with_context(d.id, all_data, body.message, memory.get(body.session_id))
+    memory.add(body.session_id, 'assistant', response.answer)
     return response
 
 @router.post('/generate-sql', response_model=AnalysisResponse)

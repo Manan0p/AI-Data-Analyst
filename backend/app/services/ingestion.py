@@ -2,7 +2,12 @@ import hashlib
 import io
 import pandas as pd
 from fastapi import HTTPException, UploadFile
+from app.config import settings
 from app.database.registry import Dataset, DatasetRegistry
+
+
+MAX_FILE_SIZE_BYTES = settings.max_upload_mb * 1024 * 1024
+MAX_ROW_COUNT = settings.max_row_count
 
 
 class CsvIngestionService:
@@ -14,6 +19,8 @@ class CsvIngestionService:
             raise HTTPException(400, "Only CSV files are supported")
         if not content.strip():
             raise HTTPException(400, f"{filename} is empty")
+        if len(content) > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(413, f"File size ({len(content)} bytes) exceeds maximum limit of {MAX_FILE_SIZE_BYTES // (1024 * 1024)}MB")
 
         decoded = None
         for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
@@ -33,6 +40,8 @@ class CsvIngestionService:
 
         if frame.empty or not len(frame.columns):
             raise HTTPException(400, "CSV must contain headers and at least one data row")
+        if len(frame) > MAX_ROW_COUNT:
+            raise HTTPException(400, f"Dataset contains {len(frame)} rows, which exceeds maximum limit of {MAX_ROW_COUNT} rows")
         if frame.columns.duplicated().any():
             raise HTTPException(400, f"Duplicate column names: {frame.columns[frame.columns.duplicated()].tolist()}")
 
