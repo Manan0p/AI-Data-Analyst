@@ -3,10 +3,35 @@
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
+import { useAuth } from '@/store/useAuth';
+import { LandingPage } from '@/components/LandingPage';
 
-export default function DashboardPage() {
+export default function RootPage() {
+  const { user, isInitialized, openAuthModal } = useAuth();
   const queryClient = useQueryClient();
-  const { data: datasets, isLoading } = useQuery({ queryKey: ['datasets'], queryFn: api.datasets });
+
+  const { data: datasets, isLoading } = useQuery({
+    queryKey: ['datasets', user?.id],
+    queryFn: api.datasets,
+    enabled: !!user,
+  });
+
+  // Unauthenticated users see the landing page
+  if (isInitialized && !user) {
+    return <LandingPage onOpenAuth={openAuthModal} />;
+  }
+
+  // Transient hydration state
+  if (!isInitialized) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center bg-[#09090b]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-7 h-7 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin" />
+          <p className="text-xs text-gray-500 font-medium tracking-wide">Loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   const totalRows = datasets?.reduce((s, d) => s + d.rows, 0) ?? 0;
   const totalCols = datasets?.reduce((s, d) => s + d.columns, 0) ?? 0;

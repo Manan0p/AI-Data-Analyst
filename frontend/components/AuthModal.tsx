@@ -1,20 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, User } from '@/services/api';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (user: User) => void;
+  initialMode?: 'login' | 'register';
 }
 
-export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
-  const [isLogin, setIsLogin] = useState(true);
+export function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'login' }: AuthModalProps) {
+  const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Sync mode when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsLogin(initialMode === 'login');
+      setError(null);
+    }
+  }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
 

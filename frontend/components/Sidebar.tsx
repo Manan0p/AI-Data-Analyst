@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, authStorage, User } from '@/services/api';
-import { AuthModal } from './AuthModal';
+import { api } from '@/services/api';
+import { useAuth } from '@/store/useAuth';
 
 const NAV = [
   { href: '/',         label: 'Dashboard',  icon: '⬡' },
@@ -15,12 +14,7 @@ const NAV = [
 export function Sidebar() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-
-  useEffect(() => {
-    setCurrentUser(authStorage.getUser());
-  }, []);
+  const { user: currentUser, logout, openAuthModal } = useAuth();
 
   const { data: datasets } = useQuery({
     queryKey: ['datasets', currentUser?.id],
@@ -32,13 +26,7 @@ export function Sidebar() {
     href === '/' ? pathname === '/' : pathname?.startsWith(href) ?? false;
 
   const handleLogout = () => {
-    api.logout();
-    setCurrentUser(null);
-    queryClient.invalidateQueries({ queryKey: ['datasets'] });
-  };
-
-  const handleAuthSuccess = (user: User) => {
-    setCurrentUser(user);
+    logout();
     queryClient.invalidateQueries({ queryKey: ['datasets'] });
   };
 
@@ -74,7 +62,7 @@ export function Sidebar() {
           </div>
         ) : (
           <button
-            onClick={() => setIsAuthOpen(true)}
+            onClick={() => openAuthModal('login')}
             className="w-full py-1.5 px-3 rounded-lg text-xs font-medium text-white shadow-sm flex items-center justify-center gap-1.5 transition-all"
             style={{ background: 'linear-gradient(135deg, #0284c7, #6366f1)' }}
           >
@@ -132,12 +120,6 @@ export function Sidebar() {
           <p className="mt-0.5 text-xs" style={{ color: 'var(--text-faint)' }}>gemini-2.5-flash</p>
         </div>
       </div>
-
-      <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        onSuccess={handleAuthSuccess}
-      />
     </aside>
   );
 }
