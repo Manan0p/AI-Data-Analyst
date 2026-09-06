@@ -1,11 +1,11 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Providers } from './providers';
-import { Sidebar } from '@/components/Sidebar';
+import { AppShell } from '@/components/AppShell';
 
 export const metadata: Metadata = {
   title: 'InsightForge — AI Data Analyst',
-  description: 'Upload CSVs, ask questions, generate charts, and detect anomalies with Gemini AI.',
+  description: 'Upload CSVs, ask questions, generate charts, and detect anomalies with Gemini AI and LangGraph.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -13,12 +13,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <Providers>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <main className="flex-1 overflow-auto">
-              {children}
-            </main>
-          </div>
+          <AppShell>
+            {children}
+          </AppShell>
         </Providers>
       </body>
     </html>
