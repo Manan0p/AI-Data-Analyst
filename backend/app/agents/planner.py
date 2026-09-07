@@ -168,6 +168,7 @@ class GeminiPlannerAgent(PlannerAgent):
         datasets: dict[str, pd.DataFrame],
         message: str,
         history: list[dict[str, str]],
+        rag_context: list[dict[str, str]] | None = None,
     ) -> AnalysisResponse:
         primary_key = DatasetRegistry.table_name(primary_id)
         primary = datasets.get(primary_key)
@@ -179,8 +180,34 @@ class GeminiPlannerAgent(PlannerAgent):
 
         try:
             schema_data = json.loads(self._schema(datasets))
+
+            # ── Build enriched message list ─────────────────────────────────
+            # Order: [RAG semantic context] + [recent turns] + [current user msg]
+            messages: list[dict] = []
+
+            if rag_context:
+                # Inject a synthetic system note so the LLM understands the source
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "[Context: the following turns from earlier in this conversation "
+                        "are semantically relevant to the current question]\n"
+                        + "\n".join(
+                            f"{t['role'].upper()}: {t['content']}"
+                            for t in rag_context
+                        )
+                    ),
+                })
+                messages.append({
+                    "role": "model",
+                    "content": "Understood. I will use this context when answering.",
+                })
+
+            messages.extend(history)
+            messages.append({"role": "user", "content": message})
+
             initial_state = {
-                "messages": history + [{"role": "user", "content": message}],
+                "messages": messages,
                 "dataset_id": primary_id,
                 "schema": schema_data,
                 "intent": None,

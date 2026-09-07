@@ -22,17 +22,19 @@ export type Profile = {
 
 export type Analysis = {
   answer: string;
-  reasoning: string;
-  confidence: number;
-  assumptions: string[];
-  limitations: string[];
+  reasoning?: string;
+  confidence?: number;
+  assumptions?: string[];
+  limitations?: string[];
   generated_sql?: string | null;
   generated_pandas?: string | null;
+  code?: string | null;
+  data?: Record<string, unknown>[];
   chart?: {
     data: unknown[];
     layout: object;
   } | null;
-  insights: string[];
-  anomalies: Record<string, unknown>[];
-  metadata: Record<string, unknown>;
+  insights?: string[];
+  anomalies?: Record<string, unknown>[];
+  metadata?: Record<string, unknown>;
 };

@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><title>InsightForge</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"surface-variant":"#dae2fd","error-container":"#ffdad6","secondary":"#006591","on-primary-container":"#dad7ff","on-tertiary":"#ffffff","surface-dim":"#d2d9f4","on-secondary-container":"#004666","inverse-primary":"#c3c0ff","primary-fixed-dim":"#c3c0ff","surface":"#faf8ff","on-primary-fixed":"#0f0069","on-surface":"#131b2e","primary-fixed":"#e2dfff","tertiary-fixed-dim":"#4edea3","primary-container":"#4f46e5","secondary-fixed-dim":"#89ceff","on-primary-fixed-variant":"#3323cc","secondary-container":"#39b8fd","surface-container-lowest":"#ffffff","tertiary":"#005338","primary":"#3525cd","on-surface-variant":"#464555","surface-container-low":"#f2f3ff","secondary-fixed":"#c9e6ff","surface-container-high":"#e2e7ff","surface-bright":"#faf8ff","surface-tint":"#4d44e3","inverse-surface":"#283044","background":"#faf8ff","surface-container-highest":"#dae2fd","tertiary-container":"#006e4b","on-background":"#131b2e","on-secondary-fixed-variant":"#004c6e","on-tertiary-container":"#67f4b7","on-primary":"#ffffff","on-tertiary-fixed-variant":"#005236","surface-container":"#eaedff","on-secondary-fixed":"#001e2f","on-error":"#ffffff","outline-variant":"#c7c4d8","error":"#ba1a1a","on-error-container":"#93000a","outline":"#777587","inverse-on-surface":"#eef0ff","tertiary-fixed":"#6ffbbe","on-tertiary-fixed":"#002113","on-secondary":"#ffffff"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"panel-sidebar":"18rem","space-xl":"1.5rem","space-lg":"1.25rem","space-3xs":"0.125rem","gutter-canvas":"1.5rem","space-3xl":"3rem","space-2xl":"2rem","space-md":"1rem","space-xs":"0.5rem","space-sm":"0.75rem","space-2xs":"0.25rem","panel-inspect":"22rem"},"fontFamily":{"title-md":["Inter"],"label-sm":["JetBrains Mono"],"display-lg":["Plus Jakarta Sans"],"body-md":["Inter"],"code-md":["JetBrains Mono"],"body-lg":["Inter"],"code-sm":["JetBrains Mono"],"body-sm":["Inter"],"headline-md":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"],"label-md":["Inter"],"headline-lg":["Plus Jakarta Sans"],"display-sm":["Plus Jakarta Sans"]},"fontSize":{"title-md":["1rem",{"lineHeight":"1.5rem","letterSpacing":"-0.01em","fontWeight":"600"}],"label-sm":["0.6875rem",{"lineHeight":"0.875rem","letterSpacing":"0.04em","fontWeight":"600"}],"display-lg":["2.25rem",{"lineHeight":"2.75rem","letterSpacing":"-0.03em","fontWeight":"700"}],"body-md":["0.875rem",{"lineHeight":"1.375rem","letterSpacing":"0em","fontWeight":"400"}],"code-md":["0.8125rem",{"lineHeight":"1.375rem","letterSpacing":"-0.01em","fontWeight":"500"}],"body-lg":["1rem",{"lineHeight":"1.625rem","letterSpacing":"-0.005em","fontWeight":"400"}],"code-sm":["0.6875rem",{"lineHeight":"1.125rem","letterSpacing":"0em","fontWeight":"500"}],"body-sm":["0.75rem",{"lineHeight":"1.125rem","letterSpacing":"0.01em","fontWeight":"400"}],"headline-md":["1.25rem",{"lineHeight":"1.75rem","letterSpacing":"-0.015em","fontWeight":"600"}],"headline-sm":["1.125rem",{"lineHeight":"1.5rem","letterSpacing":"-0.01em","fontWeight":"600"}],"label-md":["0.8125rem",{"lineHeight":"1.125rem","letterSpacing":"0.01em","fontWeight":"500"}],"headline-lg":["1.5rem",{"lineHeight":"2rem","letterSpacing":"-0.02em","fontWeight":"600"}],"display-sm":["1.75rem",{"lineHeight":"2.25rem","letterSpacing":"-0.02em","fontWeight":"600"}]}}}};</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 w-full px-gutter-canvas flex items-center justify-between gap-space-lg"><div class="flex items-center gap-space-xl"><div class="flex items-center gap-space-sm"><img alt="InsightForge Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VVLdLsLBFCqz4XtVOwMNRDO0iMlepLg6ltCmsgM4Ox0Rqlt4tSQGJ0Cgw0HlZyW7x2hooZ22d2N3ZnbFajzveTA4usVn0UJiE7BKKUJszuVkfPFtAAvWVRCAyntAlOR0Uow-JTnwv9VDuAdR2e8hkC4LHaY0XVxwpZ8kfDQOygqAp_CiY4I5O2-MgWv4PxSIZdKXnPCpbJmDk1jBJB6204PqHYKz0XevEIk-9c24JhREroH-V6c2aD"/><div class="flex items-center gap-space-xs"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight">InsightForge</span><span class="px-space-xs py-space-3xs rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm uppercase">Autonomous AI Studio</span></div></div><nav class="flex items-center gap-space-lg" data-active-classes="text-primary font-bold border-b-2 border-primary"><a class="py-space-xs text-on-surface-variant hover:text-on-surface transition-colors font-label-md text-label-md" data-path="datasets" href="#">Datasets</a><a class="py-space-xs text-on-surface-variant hover:text-on-surface transition-colors font-label-md text-label-md" data-path="executive-insights" href="#">Executive Insights</a><a aria-current="page" class="py-space-xs transition-colors text-primary font-bold border-b-2 border-primary" data-path="agent-analyst-chat" href="#">Agent Analyst Chat</a><a class="py-space-xs text-on-surface-variant hover:text-on-surface transition-colors font-label-md text-label-md" data-path="explorer-and-profiler" href="#">Explorer &amp; Profiler</a></nav></div><div class="flex items-center gap-space-md"><div class="hidden xl:flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-primary-fixed text-on-primary-fixed font-code-sm text-code-sm shadow-sm"><span class="material-symbols-outlined text-[14px] text-primary animate-pulse">bolt</span><span>Gemini 2.5 Flash + Groq Llama 3.1-8B</span></div><div class="hidden md:flex items-center gap-space-2xs px-space-xs py-space-3xs font-code-sm text-code-sm text-on-surface-variant"><span class="w-2 h-2 rounded-full bg-tertiary-fixed-dim ring-4 ring-tertiary-fixed/30"></span><span>Connected (14ms)</span></div><button aria-label="Notifications" class="relative p-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span></button><div class="flex items-center gap-space-sm pl-space-xs"><div class="relative flex items-center gap-space-xs"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUBBz82st0LcxTXF-r3iCk7GjpQTbTX95Ays8EHlKCx4wPHcmr4uB4PJMuhPDEAoXFsOjcdtcK9_DpD3PUeUnEOBDXmHG38mg3Vk_uEDCBuxIcGOM6BDiurWcJ45JSUf6j4pg4V67E80mAvsiXsenhZt8YwU_x69SUjoPghzJhi2pc3ZGo1Dxv87bWQqxB_9MD8uANaUzMq-R_ELFKh7iSxaXEb1pWNfyL2EzwZiDjYNfYOmI5T5VZ"/><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-tertiary-fixed-dim ring-2 ring-surface-container-lowest"></span></div><div class="hidden lg:flex flex-col items-start leading-none"><span class="font-label-md text-label-md text-on-surface">Dr. Elena Rostova</span><span class="font-body-sm text-body-sm text-on-surface-variant">Data Lead</span></div><span class="material-symbols-outlined text-[18px] text-on-surface-variant">expand_more</span></div></div></div></header><main class="w-full pt-16 bg-surface"><div class="w-full min-h-[calc(100vh-64px)] bg-surface" id="app-content"><div class="flex flex-col w-full">
+<!-- Interactive Multi-Agent Chat & Visual Canvas Split Screen -->
+<div class="flex flex-col lg:flex-row w-full h-[calc(100vh-64px)] overflow-hidden bg-surface">
+<!-- LEFT PANE: Chat Stream & Agent Swarm (44% on large screens) -->
+<section class="w-full lg:w-[44%] flex flex-col h-full bg-surface-container-lowest shadow-[4px_0_24px_rgba(19,27,46,0.02)] z-10 relative">
+<!-- Agent Session Header -->
+<header class="px-space-md py-space-sm bg-surface-container-lowest shadow-[0_1px_4px_rgba(19,27,46,0.03)] shrink-0">
+<div class="flex items-center justify-between gap-space-xs mb-space-2xs">
+<div class="flex items-center gap-space-xs min-w-0">
+<span class="p-space-3xs rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]">hub</span>
+</span>
+<h1 class="font-title-md text-title-md text-on-surface truncate">
+              Autonomous Exploration: Regional Margin &amp; Shipping Outliers
+            </h1>
+</div>
+<div class="flex items-center gap-space-xs shrink-0 font-code-sm text-code-sm text-on-surface-variant bg-surface-container-low px-space-xs py-space-3xs rounded-full">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-fixed-dim animate-ping"></span>
+<span>142ms runtime • 840 tokens</span>
+</div>
+</div>
+<!-- Agent Swarm Pill Tags -->
+<div class="flex items-center gap-space-2xs overflow-x-auto pb-space-3xs">
+<span class="inline-flex items-center gap-space-3xs px-space-xs py-space-3xs rounded-full bg-surface-container-low text-on-surface-variant font-code-sm text-code-sm">
+<span>🧠</span>
+<span class="font-medium">Planner</span>
+</span>
+<span class="inline-flex items-center gap-space-3xs px-space-xs py-space-3xs rounded-full bg-surface-container-low text-on-surface-variant font-code-sm text-code-sm">
+<span>🐍</span>
+<span class="font-medium">Sandbox</span>
+</span>
+<span class="inline-flex items-center gap-space-3xs px-space-xs py-space-3xs rounded-full bg-surface-container-low text-secondary font-code-sm text-code-sm">
+<span>📊</span>
+<span class="font-medium">Chart</span>
+</span>
+<span class="inline-flex items-center gap-space-3xs px-space-xs py-space-3xs rounded-full bg-surface-container-low text-primary font-code-sm text-code-sm">
+<span>✍️</span>
+<span class="font-medium">Storyteller</span>
+</span>
+<span class="ml-auto inline-flex items-center gap-1 text-on-surface-variant font-code-sm text-code-sm px-2 py-0.5 rounded bg-surface-container-high">
+<span class="material-symbols-outlined text-[12px]">dataset</span>
+            Q3_Sales_Report.csv
+          </span>
+</div>
+</header>
+<!-- Chat Messages Scroll Container -->
+<div class="flex-1 overflow-y-auto px-space-md py-space-md space-y-space-md scroll-smooth" id="chat-stream-container">
+<!-- User Query Bubble -->
+<article class="flex items-start justify-end gap-space-xs pl-space-xl">
+<div class="flex flex-col items-end gap-space-3xs max-w-[88%]">
+<div class="px-space-md py-space-sm rounded-xl rounded-tr-none bg-primary text-on-primary shadow-sm font-body-md text-body-md">
+              Can you breakdown why shipping costs spiked in August and visualize whether it impacted EMEA margins?
+            </div>
+<div class="flex items-center gap-space-2xs text-on-surface-variant font-code-sm text-code-sm pr-space-3xs">
+<span>Dr. Elena Rostova</span>
+<span>•</span>
+<span>10:42 AM</span>
+</div>
+</div>
+<div class="w-7 h-7 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center font-label-sm text-label-sm font-bold shrink-0">
+            ER
+          </div>
+</article>
+<!-- Multi-Agent Orchestration Sequence -->
+<div class="flex flex-col gap-space-sm pr-space-lg">
+<!-- Agent Step 1: Planner -->
+<article class="flex items-start gap-space-xs">
+<div class="w-7 h-7 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center shrink-0 shadow-sm">
+<span class="text-[14px]">🧠</span>
+</div>
+<div class="flex-1 min-w-0 bg-surface-container-low rounded-xl p-space-sm shadow-sm space-y-space-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-2xs">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Planner Agent</span>
+<span class="px-space-2xs py-space-3xs rounded-full bg-surface-container text-on-surface-variant font-code-sm text-code-sm">Step 1/4</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">0.08s</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface">
+                Decomposed analysis into 3 sub-tasks: 1) Filter August transactions, 2) Group by logistics carrier &amp; region, 3) Calculate Pearson correlation with net margin.
+              </p>
+<!-- Collapsible Thinking Process -->
+<details class="group rounded-lg bg-surface-container-lowest p-space-xs">
+<summary class="cursor-pointer font-code-sm text-code-sm text-primary flex items-center justify-between select-none">
+<span class="flex items-center gap-space-2xs">
+<span class="material-symbols-outlined text-[16px] transition-transform group-open:rotate-90">chevron_right</span>
+                    Thinking Process (4 steps resolved in 0.08s)
+                  </span>
+<span class="text-on-surface-variant font-normal">Deterministic plan</span>
+</summary>
+<div class="mt-space-xs pl-space-sm space-y-space-2xs font-code-sm text-code-sm text-on-surface-variant">
+<div class="flex items-center gap-space-2xs">
+<span class="text-tertiary font-bold">✓</span>
+<span>Loaded schema [order_id, date, region, carrier, order_value, shipping_cost, margin]</span>
+</div>
+<div class="flex items-center gap-space-2xs">
+<span class="text-tertiary font-bold">✓</span>
+<span>Identified 48,219 entries in temporal boundary (2024-08-01 through 2024-08-31)</span>
+</div>
+<div class="flex items-center gap-space-2xs">
+<span class="text-tertiary font-bold">✓</span>
+<span>Executed parametric anomaly filter (&gt; 3.2 IQR shipping threshold)</span>
+</div>
+<div class="flex items-center gap-space-2xs">
+<span class="text-tertiary font-bold">✓</span>
+<span>Routed parsed series to Visual Rendering Agent &amp; Executive Storyteller</span>
+</div>
+</div>
+</details>
+</div>
+</article>
+<!-- Agent Step 2: Code Sandbox -->
+<article class="flex items-start gap-space-xs">
+<div class="w-7 h-7 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center shrink-0 shadow-sm">
+<span class="text-[14px]">🐍</span>
+</div>
+<div class="flex-1 min-w-0 bg-surface-container-low rounded-xl p-space-sm shadow-sm space-y-space-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-2xs">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Code Execution Agent</span>
+<span class="px-space-2xs py-space-3xs rounded-full bg-surface-container text-on-surface-variant font-code-sm text-code-sm">Pyodide 0.26 / Pandas 2.2</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 font-code-sm text-code-sm" title="Copy snippet" type="button">
+<span class="material-symbols-outlined text-[14px]">content_copy</span>
+<span>Copy</span>
+</button>
+</div>
+<!-- Monospace Sandbox Snippet -->
+<div class="rounded-lg bg-inverse-surface text-inverse-on-surface p-space-sm font-code-md text-code-md overflow-x-auto shadow-inner leading-relaxed">
+<div class="text-tertiary-fixed-dim"><span class="text-secondary-fixed">import</span> pandas <span class="text-secondary-fixed">as</span> pd</div>
+<div>aug_df = df[df[<span class="text-secondary-fixed-dim">'order_date'</span>].str.startswith(<span class="text-secondary-fixed-dim">'2024-08'</span>)]</div>
+<div>carrier_spike = aug_df.groupby(<span class="text-secondary-fixed-dim">'carrier'</span>)[<span class="text-secondary-fixed-dim">'shipping_cost'</span>].agg([<span class="text-secondary-fixed-dim">'mean'</span>, <span class="text-secondary-fixed-dim">'std'</span>, <span class="text-secondary-fixed-dim">'count'</span>])</div>
+<div>emea_margin = aug_df[aug_df[<span class="text-secondary-fixed-dim">'region'</span>] == <span class="text-secondary-fixed-dim">'EMEA'</span>][<span class="text-secondary-fixed-dim">'margin_pct'</span>].mean()</div>
+<div class="text-outline-variant">print(carrier_spike)</div>
+</div>
+<!-- Execution Telemetry Pill -->
+<div class="flex items-center justify-between flex-wrap gap-space-xs px-space-xs py-space-2xs rounded bg-surface-container-lowest text-on-surface-variant font-code-sm text-code-sm">
+<div class="flex items-center gap-space-2xs">
+<span class="w-2 h-2 rounded-full bg-tertiary-container"></span>
+<span class="font-medium text-tertiary-container">Exit Code 0</span>
+<span>•</span>
+<span>Execution time: 142ms</span>
+</div>
+<span class="font-medium">Rows evaluated: 48,219</span>
+</div>
+</div>
+</article>
+<!-- Agent Step 3: Chart Specialist -->
+<article class="flex items-start gap-space-xs">
+<div class="w-7 h-7 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center shrink-0 shadow-sm">
+<span class="text-[14px]">📊</span>
+</div>
+<div class="flex-1 min-w-0 bg-surface-container-low rounded-xl p-space-sm shadow-sm space-y-space-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-2xs">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Chart Specialist</span>
+<span class="px-space-2xs py-space-3xs rounded-full bg-secondary-fixed text-on-secondary-fixed font-code-sm text-code-sm">Plotly React Artifact</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Synchronized</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface">
+                Generated interactive bivariate distribution. Visualized in the canvas pane on the right with regression paths and outlier annotations.
+              </p>
+<div class="flex items-center gap-space-xs text-secondary font-code-sm text-code-sm pt-space-3xs">
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+<button class="hover:underline font-medium" onclick="focusOutlier()" type="button">Jump to Outlier Order #98241</button>
+</div>
+</div>
+</article>
+<!-- Agent Step 4: Storyteller -->
+<article class="flex items-start gap-space-xs">
+<div class="w-7 h-7 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center shrink-0 shadow-sm">
+<span class="text-[14px]">✍️</span>
+</div>
+<div class="flex-1 min-w-0 bg-surface-container-low rounded-xl p-space-sm shadow-sm space-y-space-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-2xs">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Data Storyteller</span>
+<span class="px-space-2xs py-space-3xs rounded-full bg-primary-fixed text-on-primary-fixed font-code-sm text-code-sm">Synthesis</span>
+</div>
+<span class="font-code-sm text-code-sm text-tertiary font-medium">Confidence: 97.4%</span>
+</div>
+<div class="font-body-md text-body-md text-on-surface space-y-space-xs">
+<p>
+<strong>Conclusion:</strong> Carrier <span class="font-semibold text-primary">FastFreight Express</span> introduced an unannounced peak-season fuel surcharge on August 12, accounting for <strong class="text-on-surface">89% of the cost variance</strong>.
+                </p>
+<p class="text-on-surface-variant">
+                  EMEA gross margin dipped <span class="text-error font-semibold">-2.3%</span> temporarily before recovering in September once procurement rerouted 62% of standard freight to DHL Global.
+                </p>
+</div>
+<!-- Recommendation pill box -->
+<div class="mt-space-2xs p-space-xs rounded-lg bg-surface-container-lowest flex items-center justify-between">
+<div class="flex items-center gap-space-xs text-on-surface font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px] text-tertiary">verified</span>
+<span>Action: Renegotiate Q4 fuel rate rider clause with FastFreight.</span>
+</div>
+<button class="text-primary hover:text-on-primary-fixed-variant font-label-sm text-label-sm font-semibold" type="button">
+                  View Clause
+                </button>
+</div>
+</div>
+</article>
+</div>
+</div>
+<!-- Quick Suggestion Pills & Input Form -->
+<footer class="p-space-md bg-surface-container-lowest shadow-[0_-2px_12px_rgba(19,27,46,0.03)] shrink-0 space-y-space-xs">
+<!-- Prompt Quick-Actions -->
+<div class="flex items-center gap-space-xs overflow-x-auto pb-space-3xs">
+<button class="whitespace-nowrap px-space-sm py-space-3xs rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors font-body-sm text-body-sm flex items-center gap-1" onclick="insertPrompt('Plot revenue by region')" type="button">
+<span class="material-symbols-outlined text-[14px]">query_stats</span>
+            Plot revenue by region
+          </button>
+<button class="whitespace-nowrap px-space-sm py-space-3xs rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors font-body-sm text-body-sm flex items-center gap-1" onclick="insertPrompt('Find correlations with price')" type="button">
+<span class="material-symbols-outlined text-[14px]">tune</span>
+            Find correlations with price
+          </button>
+<button class="whitespace-nowrap px-space-sm py-space-3xs rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors font-body-sm text-body-sm flex items-center gap-1" onclick="insertPrompt('Detect anomalies in shipping cost')" type="button">
+<span class="material-symbols-outlined text-[14px]">crisis_alert</span>
+            Detect anomalies in shipping cost
+          </button>
+</div>
+<!-- Chat Input Field -->
+<div class="relative rounded-xl bg-surface-container-low focus-within:bg-surface-container-lowest focus-within:shadow-md transition-all p-space-xs space-y-space-xs">
+<textarea class="w-full bg-transparent resize-none outline-none font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant px-space-2xs py-space-3xs" id="agent-input" placeholder="Ask InsightForge agents anything about Q3_Sales_Report.csv..." rows="2"></textarea>
+<div class="flex items-center justify-between pt-space-3xs">
+<div class="flex items-center gap-space-2xs">
+<button class="p-space-2xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" title="Attach CSV / Context" type="button">
+<span class="material-symbols-outlined text-[18px]">attach_file</span>
+</button>
+<button class="px-space-xs py-space-3xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-code-sm text-code-sm flex items-center gap-1 transition-colors" id="code-mode-btn" onclick="toggleCodeMode()" type="button">
+<span class="material-symbols-outlined text-[16px]">code</span>
+<span>Code Mode</span>
+</button>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="hidden sm:inline font-code-sm text-code-sm text-on-surface-variant">⌘ + Enter</span>
+<button class="px-space-md py-space-xs rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md flex items-center gap-space-2xs shadow-sm active:scale-95 transition-all" id="send-chat-btn" type="button">
+<span>Send</span>
+<span class="material-symbols-outlined text-[16px]">arrow_upward</span>
+</button>
+</div>
+</div>
+</div>
+</footer>
+</section>
+<!-- RIGHT PANE: Interactive Canvas & Artifact Inspector (56% width) -->
+<main class="w-full lg:w-[56%] flex flex-col h-full bg-surface-container-low overflow-y-auto p-space-md lg:p-space-lg gap-space-md">
+<!-- Canvas Top Controls Bar -->
+<section class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm bg-surface-container-lowest p-space-sm rounded-xl shadow-sm shrink-0">
+<!-- Segmented View Mode Toggle -->
+<div class="flex items-center p-space-3xs rounded-lg bg-surface-container-low font-body-sm text-body-sm text-on-surface-variant">
+<button class="px-space-sm py-space-2xs rounded-md bg-surface-container-lowest text-on-surface font-semibold shadow-sm flex items-center gap-space-2xs transition-all" id="tab-chart" onclick="switchView('chart')" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary">scatter_plot</span>
+<span>Chart View</span>
+</button>
+<button class="px-space-sm py-space-2xs rounded-md hover:text-on-surface flex items-center gap-space-2xs transition-all" id="tab-table" onclick="switchView('table')" type="button">
+<span class="material-symbols-outlined text-[16px]">table_chart</span>
+<span>Clean Data Table</span>
+</button>
+<button class="px-space-sm py-space-2xs rounded-md hover:text-on-surface flex items-center gap-space-2xs transition-all" id="tab-raw" onclick="switchView('raw')" type="button">
+<span class="material-symbols-outlined text-[16px]">terminal</span>
+<span>Raw Python Code</span>
+</button>
+</div>
+<!-- Export & Fullscreen Tools -->
+<div class="flex items-center gap-space-2xs flex-wrap">
+<button class="px-space-xs py-space-2xs rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface font-code-sm text-code-sm flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">image</span>
+<span>PNG</span>
+</button>
+<button class="px-space-xs py-space-2xs rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface font-code-sm text-code-sm flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">data_object</span>
+<span>Plotly JSON</span>
+</button>
+<button class="px-space-xs py-space-2xs rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface font-code-sm text-code-sm flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">download</span>
+<span>CSV</span>
+</button>
+<div class="w-px h-4 bg-surface-container-high mx-space-3xs"></div>
+<button aria-label="Toggle Fullscreen" class="p-space-2xs rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">fullscreen</span>
+</button>
+</div>
+</section>
+<!-- Main Interactive Display (Chart View Default) -->
+<div class="flex-1 min-h-[380px] bg-surface-container-lowest rounded-2xl p-space-md lg:p-space-lg shadow-sm flex flex-col justify-between relative overflow-hidden" id="view-chart">
+<!-- Header & Carrier Legend Filter Chips -->
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-xs shrink-0 z-10">
+<div>
+<div class="flex items-center gap-space-2xs">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Shipping Cost vs. Order Value</h2>
+<span class="px-space-xs py-space-3xs rounded-full bg-error-container text-on-error-container font-code-sm text-code-sm font-semibold">
+                Anomaly Cluster
+              </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Bivariate distribution showing August surcharge escalation</p>
+</div>
+<!-- Interactive Filters -->
+<div class="flex items-center gap-space-xs flex-wrap">
+<button class="px-space-xs py-space-3xs rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm flex items-center gap-1.5 shadow-sm" type="button">
+<span class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></span>
+<span>FastFreight (Spike detected)</span>
+</button>
+<button class="px-space-xs py-space-3xs rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm flex items-center gap-1.5 transition-colors" type="button">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<span>DHL Global</span>
+</button>
+<button class="px-space-xs py-space-3xs rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm flex items-center gap-1.5 transition-colors" type="button">
+<span class="w-2 h-2 rounded-full bg-secondary-container"></span>
+<span>Local Courier</span>
+</button>
+</div>
+</div>
+<!-- High-Fidelity Inline Interactive SVG Scatter Plot -->
+<div class="w-full flex-1 relative my-space-sm flex items-center justify-center select-none">
+<svg class="w-full h-full max-h-[440px] overflow-visible" preserveaspectratio="none" viewbox="0 0 740 360">
+<defs>
+<lineargradient id="trendGradient" x1="0%" x2="100%" y1="100%" y2="0%">
+<stop offset="0%" stop-color="#4f46e5" stop-opacity="0.2"></stop>
+<stop offset="100%" stop-color="#39b8fd" stop-opacity="0.8"></stop>
+</lineargradient>
+<lineargradient id="spikeTrend" x1="0%" x2="100%" y1="100%" y2="0%">
+<stop offset="0%" stop-color="#f59e0b" stop-opacity="0.3"></stop>
+<stop offset="100%" stop-color="#ba1a1a" stop-opacity="0.9"></stop>
+</lineargradient>
+<filter height="200%" id="glow-amber" width="200%" x="-50%" y="-50%">
+<fedropshadow dx="0" dy="0" flood-color="#f59e0b" flood-opacity="0.8" stddeviation="4"></fedropshadow>
+</filter>
+</defs>
+<!-- Grid Lines -->
+<line stroke="#dae2fd" stroke-width="1" x1="50" x2="720" y1="310" y2="310"></line>
+<line stroke="#eaedff" stroke-dasharray="4,4" stroke-width="1" x1="50" x2="720" y1="240" y2="240"></line>
+<line stroke="#eaedff" stroke-dasharray="4,4" stroke-width="1" x1="50" x2="720" y1="170" y2="170"></line>
+<line stroke="#eaedff" stroke-dasharray="4,4" stroke-width="1" x1="50" x2="720" y1="100" y2="100"></line>
+<line stroke="#eaedff" stroke-dasharray="4,4" stroke-width="1" x1="50" x2="720" y1="30" y2="30"></line>
+<line stroke="#dae2fd" stroke-width="1" x1="50" x2="50" y1="310" y2="30"></line>
+<line stroke="#eaedff" stroke-dasharray="4,4" stroke-width="1" x1="217" x2="217" y1="310" y2="30"></line>
+<line stroke="#eaedff" stroke-dasharray="4,4" stroke-width="1" x1="384" x2="384" y1="310" y2="30"></line>
+<line stroke="#eaedff" stroke-dasharray="4,4" stroke-width="1" x1="551" x2="551" y1="310" y2="30"></line>
+<line stroke="#eaedff" stroke-dasharray="4,4" stroke-width="1" x1="720" x2="720" y1="310" y2="30"></line>
+<!-- Axis Labels (Y: Shipping Cost, X: Order Value) -->
+<text class="font-code-sm text-[10px] fill-outline" text-anchor="end" x="42" y="314">$0</text>
+<text class="font-code-sm text-[10px] fill-outline" text-anchor="end" x="42" y="244">$120</text>
+<text class="font-code-sm text-[10px] fill-outline" text-anchor="end" x="42" y="174">$240</text>
+<text class="font-code-sm text-[10px] fill-outline" text-anchor="end" x="42" y="104">$360</text>
+<text class="font-code-sm text-[10px] fill-outline" text-anchor="end" x="42" y="34">$480+</text>
+<text class="font-code-sm text-[10px] fill-outline" text-anchor="middle" x="50" y="330">$0</text>
+<text class="font-code-sm text-[10px] fill-outline" text-anchor="middle" x="217" y="330">$500</text>
+<text class="font-code-sm text-[10px] fill-outline" text-anchor="middle" x="384" y="330">$1,000</text>
+<text class="font-code-sm text-[10px] fill-outline" text-anchor="middle" x="551" y="330">$1,500</text>
+<text class="font-code-sm text-[10px] fill-outline" text-anchor="middle" x="720" y="330">$2,000</text>
+<!-- Baseline Correlation Trend Line (DHL & Local) -->
+<path d="M 50 290 Q 380 260 720 230" fill="none" stroke="url(#trendGradient)" stroke-width="2.5"></path>
+<!-- Outlier Escalation Path (FastFreight) -->
+<path d="M 280 270 Q 450 180 610 50" fill="none" stroke="url(#spikeTrend)" stroke-dasharray="6,4" stroke-width="2.5"></path>
+<!-- Standard Scatter Points (Soft Indigo) -->
+<circle class="fill-primary-container/40" cx="90" cy="285" r="4"></circle>
+<circle class="fill-primary-container/40" cx="120" cy="280" r="4"></circle>
+<circle class="fill-primary-container/50" cx="160" cy="275" r="4.5"></circle>
+<circle class="fill-primary-container/40" cx="190" cy="282" r="3.5"></circle>
+<circle class="fill-secondary/50" cx="230" cy="265" r="5"></circle>
+<circle class="fill-secondary/40" cx="260" cy="270" r="4"></circle>
+<circle class="fill-primary-container/40" cx="310" cy="260" r="4.5"></circle>
+<circle class="fill-primary-container/50" cx="350" cy="255" r="5"></circle>
+<circle class="fill-secondary/50" cx="390" cy="245" r="4"></circle>
+<circle class="fill-primary-container/40" cx="430" cy="250" r="4.5"></circle>
+<circle class="fill-primary-container/40" cx="470" cy="240" r="4"></circle>
+<circle class="fill-primary-container/50" cx="510" cy="235" r="5"></circle>
+<circle class="fill-secondary/50" cx="560" cy="230" r="4"></circle>
+<circle class="fill-primary-container/40" cx="620" cy="225" r="4.5"></circle>
+<circle class="fill-primary-container/50" cx="680" cy="220" r="5"></circle>
+<!-- August Anomaly Cluster (Glowing Amber / Rose dots) -->
+<circle class="cursor-pointer" cx="380" cy="180" fill="#f59e0b" filter="url(#glow-amber)" r="5.5"></circle>
+<circle class="cursor-pointer" cx="440" cy="150" fill="#f59e0b" filter="url(#glow-amber)" r="6"></circle>
+<circle class="cursor-pointer" cx="490" cy="120" fill="#f59e0b" filter="url(#glow-amber)" r="6.5"></circle>
+<circle class="cursor-pointer" cx="530" cy="95" fill="#f59e0b" filter="url(#glow-amber)" r="6.5"></circle>
+<circle class="cursor-pointer" cx="580" cy="70" fill="#f59e0b" filter="url(#glow-amber)" r="7"></circle>
+<!-- Targeted Outlier Marker Circle (Order #98241) -->
+<circle class="animate-pulse cursor-pointer stroke-2 stroke-white" cx="610" cy="50" fill="#ba1a1a" filter="url(#glow-amber)" id="outlier-dot" r="9"></circle>
+<line opacity="0.6" stroke="#ba1a1a" stroke-dasharray="3,3" stroke-width="1.5" x1="610" x2="610" y1="50" y2="310"></line>
+<line opacity="0.6" stroke="#ba1a1a" stroke-dasharray="3,3" stroke-width="1.5" x1="50" x2="610" y1="50" y2="50"></line>
+</svg>
+<!-- Interactive Overlay Inspection Card pinned to Outlier #98241 -->
+<div class="absolute top-2 right-4 sm:right-16 bg-surface-container-lowest/95 backdrop-blur-md p-space-sm rounded-xl shadow-lg border-l-4 border-error max-w-[270px] transition-all" id="outlier-card">
+<div class="flex items-center justify-between gap-space-2xs mb-1">
+<span class="font-label-sm text-label-sm font-bold text-error uppercase tracking-wider">Outlier Highlight</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Aug 14, 2024</span>
+</div>
+<div class="font-title-md text-title-md text-on-surface">Order #98241</div>
+<div class="mt-space-2xs space-y-1 font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex justify-between">
+<span>Shipping Cost:</span>
+<strong class="text-error font-code-sm text-code-sm">$482.00</strong>
+</div>
+<div class="flex justify-between">
+<span>Normal expected:</span>
+<span class="font-code-sm text-code-sm text-on-surface">$34.50</span>
+</div>
+<div class="flex justify-between">
+<span>Carrier:</span>
+<span class="font-semibold text-primary">FastFreight Express</span>
+</div>
+<div class="flex justify-between">
+<span>Impact on margin:</span>
+<strong class="text-error font-code-sm text-code-sm">-$447.50 Margin</strong>
+</div>
+</div>
+</div>
+</div>
+<!-- Axis Explanations -->
+<div class="flex items-center justify-between text-on-surface-variant font-code-sm text-code-sm pt-space-2xs">
+<span>↑ Y-Axis: Shipping Cost (USD)</span>
+<span>X-Axis: Order Value (USD) →</span>
+</div>
+</div>
+<!-- Alternative View: Clean Data Table (Initially Hidden) -->
+<div class="hidden flex-1 min-h-[380px] bg-surface-container-lowest rounded-2xl p-space-md shadow-sm overflow-x-auto" id="view-table">
+<table class="w-full text-left font-body-sm text-body-sm">
+<thead>
+<tr class="text-on-surface-variant font-code-sm text-code-sm uppercase bg-surface-container-low">
+<th class="p-space-xs rounded-l-lg">Order ID</th>
+<th class="p-space-xs">Date</th>
+<th class="p-space-xs">Carrier</th>
+<th class="p-space-xs">Region</th>
+<th class="p-space-xs text-right">Order Value</th>
+<th class="p-space-xs text-right">Shipping Cost</th>
+<th class="p-space-xs text-right rounded-r-lg">Net Margin</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-high text-on-surface">
+<tr class="bg-error-container/20">
+<td class="p-space-xs font-code-sm text-code-sm font-bold text-error">#98241</td>
+<td class="p-space-xs">2024-08-14</td>
+<td class="p-space-xs font-semibold">FastFreight</td>
+<td class="p-space-xs">EMEA</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm">$1,640.00</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm text-error font-bold">$482.00</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm text-error">-14.2%</td>
+</tr>
+<tr>
+<td class="p-space-xs font-code-sm text-code-sm">#98240</td>
+<td class="p-space-xs">2024-08-14</td>
+<td class="p-space-xs">DHL Global</td>
+<td class="p-space-xs">EMEA</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm">$890.00</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm">$28.40</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm text-tertiary">+22.1%</td>
+</tr>
+<tr class="bg-error-container/20">
+<td class="p-space-xs font-code-sm text-code-sm font-bold text-error">#98218</td>
+<td class="p-space-xs">2024-08-13</td>
+<td class="p-space-xs font-semibold">FastFreight</td>
+<td class="p-space-xs">EMEA</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm">$1,420.00</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm text-error font-bold">$394.00</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm text-error">-8.6%</td>
+</tr>
+<tr>
+<td class="p-space-xs font-code-sm text-code-sm">#98192</td>
+<td class="p-space-xs">2024-08-13</td>
+<td class="p-space-xs">Local Courier</td>
+<td class="p-space-xs">APAC</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm">$320.00</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm">$12.00</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm text-tertiary">+28.4%</td>
+</tr>
+<tr>
+<td class="p-space-xs font-code-sm text-code-sm">#98150</td>
+<td class="p-space-xs">2024-08-12</td>
+<td class="p-space-xs">DHL Global</td>
+<td class="p-space-xs">NA</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm">$1,100.00</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm">$31.50</td>
+<td class="p-space-xs text-right font-code-sm text-code-sm text-tertiary">+19.8%</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Alternative View: Raw Python Code (Initially Hidden) -->
+<div class="hidden flex-1 min-h-[380px] bg-inverse-surface text-inverse-on-surface rounded-2xl p-space-md shadow-sm font-code-md text-code-md overflow-x-auto leading-relaxed" id="view-raw">
+<pre><code><span class="text-outline-variant"># Complete pipeline generated by InsightForge Multi-Agent Swarm</span>
+<span class="text-secondary-fixed">import</span> duckdb
+<span class="text-secondary-fixed">import</span> plotly.express <span class="text-secondary-fixed">as</span> px
+
+<span class="text-outline-variant"># 1. High performance in-memory scan</span>
+con = duckdb.connect()
+df = con.execute(<span class="text-secondary-fixed-dim">"""
+    SELECT 
+        order_id, order_date, region, carrier, order_value, shipping_cost,
+        (margin / order_value) * 100 AS margin_pct,
+        CASE WHEN carrier = 'FastFreight' AND shipping_cost &gt; 150 THEN 'Anomaly' ELSE 'Normal' END as flag
+    FROM read_csv_auto('Q3_Sales_Report.csv')
+    WHERE order_date BETWEEN '2024-08-01' AND '2024-08-31'
+"""</span>).df()
+
+<span class="text-outline-variant"># 2. Compute bivariate distribution &amp; carrier cost variance</span>
+fig = px.scatter(
+    df, x=<span class="text-secondary-fixed-dim">'order_value'</span>, y=<span class="text-secondary-fixed-dim">'shipping_cost'</span>,
+    color=<span class="text-secondary-fixed-dim">'carrier'</span>, symbol=<span class="text-secondary-fixed-dim">'flag'</span>,
+    hover_data=[<span class="text-secondary-fixed-dim">'order_id'</span>, <span class="text-secondary-fixed-dim">'margin_pct'</span>]
+)
+fig.show()</code></pre>
+</div>
+<!-- Artifact Meta Drawer & Synthesis Cards -->
+<section class="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm shrink-0 space-y-space-sm">
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-2xs">
+<span class="material-symbols-outlined text-[18px] text-tertiary">analytics</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Telemetry &amp; Decision Summary</span>
+</div>
+<!-- Add to Executive Report CTA -->
+<button class="px-space-md py-space-xs rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md flex items-center gap-space-2xs transition-all shadow-sm active:scale-98" type="button">
+<span class="material-symbols-outlined text-[18px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+<span>Add to Executive Report</span>
+</button>
+</div>
+<!-- 3 Executive Metric & Stat Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-sm">
+<div class="p-space-sm rounded-xl bg-surface-container-low flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Peak Outlier</span>
+<span class="px-space-2xs py-space-3xs rounded-full bg-error-container text-on-error-container font-code-sm text-code-sm font-semibold">
+                +1,297%
+              </span>
+</div>
+<div class="mt-space-2xs">
+<div class="font-display-sm text-display-sm text-on-surface tracking-tight">$482.00</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Order #98241 (Base mean: $34.50)</p>
+</div>
+</div>
+<div class="p-space-sm rounded-xl bg-surface-container-low flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Variance Explained</span>
+<span class="px-space-2xs py-space-3xs rounded-full bg-primary-fixed text-on-primary-fixed font-code-sm text-code-sm font-semibold">
+                R² = 0.892
+              </span>
+</div>
+<div class="mt-space-2xs">
+<div class="font-display-sm text-display-sm text-on-surface tracking-tight">89.2%</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Attributed to carrier fuel rider</p>
+</div>
+</div>
+<div class="p-space-sm rounded-xl bg-surface-container-low flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Recommended Action</span>
+<span class="material-symbols-outlined text-[18px] text-tertiary">task_alt</span>
+</div>
+<div class="mt-space-2xs">
+<div class="font-title-md text-title-md text-on-surface leading-tight">Carrier contract audit</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Recover est. $64,200 EMEA margin</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+<!-- Client-side Interactive Behaviors -->
+<script>
+    function switchView(mode) {
+      const chartView = document.getElementById('view-chart');
+      const tableView = document.getElementById('view-table');
+      const rawView = document.getElementById('view-raw');
+
+      const tabChart = document.getElementById('tab-chart');
+      const tabTable = document.getElementById('tab-table');
+      const tabRaw = document.getElementById('tab-raw');
+
+      const tabs = [tabChart, tabTable, tabRaw];
+      tabs.forEach(tab => {
+        tab.className = "px-space-sm py-space-2xs rounded-md hover:text-on-surface flex items-center gap-space-2xs transition-all";
+      });
+
+      chartView.classList.add('hidden');
+      tableView.classList.add('hidden');
+      rawView.classList.add('hidden');
+
+      if (mode === 'chart') {
+        chartView.classList.remove('hidden');
+        tabChart.className = "px-space-sm py-space-2xs rounded-md bg-surface-container-lowest text-on-surface font-semibold shadow-sm flex items-center gap-space-2xs transition-all";
+      } else if (mode === 'table') {
+        tableView.classList.remove('hidden');
+        tabTable.className = "px-space-sm py-space-2xs rounded-md bg-surface-container-lowest text-on-surface font-semibold shadow-sm flex items-center gap-space-2xs transition-all";
+      } else if (mode === 'raw') {
+        rawView.classList.remove('hidden');
+        tabRaw.className = "px-space-sm py-space-2xs rounded-md bg-surface-container-lowest text-on-surface font-semibold shadow-sm flex items-center gap-space-2xs transition-all";
+      }
+    }
+
+    function insertPrompt(text) {
+      const input = document.getElementById('agent-input');
+      input.value = text;
+      input.focus();
+    }
+
+    function focusOutlier() {
+      switchView('chart');
+      const card = document.getElementById('outlier-card');
+      const dot = document.getElementById('outlier-dot');
+      if (card && dot) {
+        card.classList.add('ring-4', 'ring-amber-400');
+        setTimeout(() => card.classList.remove('ring-4', 'ring-amber-400'), 1500);
+      }
+    }
+
+    function toggleCodeMode() {
+      const btn = document.getElementById('code-mode-btn');
+      const input = document.getElementById('agent-input');
+      if (btn.classList.contains('bg-primary-fixed')) {
+        btn.classList.remove('bg-primary-fixed', 'text-on-primary-fixed');
+        input.placeholder = "Ask InsightForge agents anything about Q3_Sales_Report.csv...";
+      } else {
+        btn.classList.add('bg-primary-fixed', 'text-on-primary-fixed');
+        input.placeholder = "Enter Python / SQL query for autonomous execution...";
+      }
+    }
+  </script>
+</div></div></main></body></html>

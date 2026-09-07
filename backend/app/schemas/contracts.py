@@ -34,3 +34,34 @@ class JobResponse(BaseModel):
     error: str | None = None
 
 
+# ── Auto-Analysis schemas ────────────────────────────────────────────────────
+
+class InsightCard(BaseModel):
+    title: str
+    body: str
+    metric: str | None = None          # big display value e.g. "42%" or "$1.2M"
+    type: str = "stat"                 # stat | trend | anomaly | distribution | correlation
+    chart: dict[str, Any] | None = None
+    importance: float = 0.5            # 0.0 – 1.0, used for sort order
+
+class DataQualityReport(BaseModel):
+    total_rows: int
+    total_columns: int
+    duplicate_rows: int
+    null_columns: list[dict[str, Any]] = []   # [{name, null_pct}] sorted desc
+    healthy_columns: int = 0
+    health_score: float = 100.0               # 0 – 100
+
+class AutoAnalysisResponse(BaseModel):
+    dataset_id: str
+    executive_summary: str
+    trend_story: str | None = None
+    insights: list[InsightCard] = []
+    charts: list[dict[str, Any]] = []
+    recommendations: list[str] = []
+    data_quality: DataQualityReport
+    anomaly_note: str | None = None
+    generated_at: str
+    gemini_used: bool = False
+    groq_used: bool = False
+    status: str = "completed"          # completed | processing | failed

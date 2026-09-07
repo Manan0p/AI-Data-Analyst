@@ -41,5 +41,18 @@ class ChatMessageModel(Base):
     session_id = Column(String, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
+    analysis_data = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class AutoAnalysisReportModel(Base):
+    __tablename__ = "auto_analysis_reports"
+
+    dataset_id = Column(String, ForeignKey("datasets.id", ondelete="CASCADE"), primary_key=True)
+    owner_id   = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    report_json = Column(JSON, nullable=False)
+    gemini_used = Column(String, default="false")
+    groq_used   = Column(String, default="false")
+    created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

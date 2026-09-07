@@ -1,4 +1,5 @@
 import { Analysis, Dataset, Profile } from '@/types';
+import { AutoAnalysis } from '@/types/insights';
 import { sessionStore } from './sessionStore';
 
 const base = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '/api' : 'http://localhost:8000/api');
@@ -9,6 +10,7 @@ const USER_KEY = 'insightforge_user';
 export interface User {
   id: string;
   email: string;
+  name?: string;
 }
 
 export interface AuthResponse {
@@ -132,13 +134,14 @@ export const api = {
     return Array.from(new Map(list.map(d => [d.id, d])).values());
   },
 
-  upload: async (files: File[]) => {
+  upload: async (files: File | File[]) => {
+    const fileList = Array.isArray(files) ? files : [files];
     const fileTexts = await Promise.all(
-      files.map(async f => ({ name: f.name, text: await f.text() }))
+      fileList.map(async f => ({ name: f.name, text: await f.text() }))
     );
 
     const body = new FormData();
-    files.forEach(f => body.append('files', f));
+    fileList.forEach(f => body.append('files', f));
     const result = await request<Dataset[]>('/upload', { method: 'POST', body });
 
     for (const ds of result) {
@@ -168,11 +171,21 @@ export const api = {
       `/datasets/${id}/rows?search=${encodeURIComponent(search)}`
     ),
 
-  chat: (dataset_id: string, message: string) =>
+  chat: (dataset_id: string, message: string, session_id?: string) =>
     request<Analysis>('/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataset_id, message }),
+      body: JSON.stringify({ dataset_id, message, session_id }),
+    }),
+
+  chatHistory: (session_id: string) =>
+    request<Array<{ role: 'user' | 'assistant'; content: string; analysis?: Analysis }>>(
+      `/chat/history/${encodeURIComponent(session_id)}`
+    ),
+
+  clearChatHistory: (session_id: string) =>
+    request<{ message: string }>(`/chat/history/${encodeURIComponent(session_id)}`, {
+      method: 'DELETE',
     }),
 
   generateSql: (dataset_id: string, query: string) =>
@@ -182,7 +195,7 @@ export const api = {
       body: JSON.stringify({ dataset_id, query }),
     }),
 
-  generateChart: (dataset_id: string, chart_type: string, x: string, y?: string) =>
+  generateChart: (dataset_id: string, chart_type: string, x: string, y: string) =>
     request<Analysis>('/generate-chart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -192,11 +205,11 @@ export const api = {
   detectAnomalies: (dataset_id: string) =>
     request<Analysis>(`/detect-anomalies?dataset_id=${dataset_id}`, { method: 'POST' }),
 
-  register: async (email: string, password: string) => {
+  register: async (email: string, password: string, name?: string) => {
     const res = await request<AuthResponse>('/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, name }),
     });
     authStorage.setToken(res.access_token);
     authStorage.setUser(res.user);
@@ -219,4 +232,20 @@ export const api = {
   },
 
   me: () => request<User>('/auth/me'),
+
+  // ── Auto-Analysis Insights ─────────────────────────────────────────────
+  insights: (id: string) =>
+    request<AutoAnalysis>(`/datasets/${id}/insights`),
+
+  generateInsights: (id: string) =>
+    request<{ job_id: string; status: string }>(
+      `/datasets/${id}/insights/generate`,
+      { method: 'POST' }
+    ),
+
+  deleteInsights: (id: string) =>
+    request<{ message: string }>(`/datasets/${id}/insights`, { method: 'DELETE' }),
+
+  // Expose raw request for custom calls (e.g. DELETE /chat/history/:session_id)
+  request,
 };

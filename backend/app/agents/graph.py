@@ -214,6 +214,8 @@ def validate_result(state: AgentState) -> Literal["select_tool", "synthesize_ans
 
 def synthesize_answer(state: AgentState) -> dict[str, Any]:
     """Format successful tool results into an AnalysisResponse."""
+    from app.agents.planner import _build_chart_from_rows
+
     tool = state.get("tool", "unknown")
     result = state.get("tool_result", {})
     args = state.get("tool_args", {})
@@ -222,19 +224,42 @@ def synthesize_answer(state: AgentState) -> dict[str, Any]:
     reasoning = args.get("reasoning", f"Executed {tool} successfully with validated result.")
     confidence = float(args.get("confidence", 0.9))
 
+    rows = result.get("rows") if isinstance(result, dict) else None
+    chart = result.get("chart") if isinstance(result, dict) else None
+
+    # Auto-generate chart from SQL / Pandas result rows if none was explicitly requested
+    if chart is None and rows and isinstance(rows, list) and len(rows) > 0 and len(rows[0]) >= 2:
+        chart_type = args.get("chart_type", "bar")
+        chart = _build_chart_from_rows(rows, chart_type, x_hint=args.get("x"), y_hint=args.get("y"))
+
+    # Synthesize rich narrative answer if generic
+    raw_answer = str(args.get("answer") or "")
+    if not raw_answer or "Analysis executed" in raw_answer or "Analysis completed" in raw_answer:
+        if rows and isinstance(rows, list) and len(rows) > 0:
+            lines = []
+            for r in rows[:8]:
+                row_str = ", ".join(f"{k}: **{v}**" for k, v in r.items())
+                lines.append(f"- {row_str}")
+            summary_text = "\n".join(lines)
+            answer = f"Found **{len(rows)}** records matching your query:\n\n{summary_text}"
+        else:
+            answer = f"Analysis completed successfully using {tool}."
+    else:
+        answer = raw_answer
+
     final_resp = AnalysisResponse(
-        answer=str(args.get("answer") or f"Analysis completed using {tool}."),
+        answer=answer,
         reasoning=reasoning,
         confidence=confidence,
         generated_sql=result.get("sql") if isinstance(result, dict) else None,
         generated_pandas=result.get("code") if isinstance(result, dict) else None,
-        chart=result.get("chart") if isinstance(result, dict) else None,
+        chart=chart,
         anomalies=result.get("anomalies", []) if isinstance(result, dict) else [],
         metadata={
             "tool": tool,
             "planner": "langgraph",
             "retries": retries,
-            "rows": result.get("rows") if isinstance(result, dict) else None,
+            "rows": rows,
             "profile": result.get("profile") if isinstance(result, dict) else None,
         },
     )

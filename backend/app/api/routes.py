@@ -120,11 +120,38 @@ def chat(
     current_user: str = Depends(get_current_user)
 ):
     d = get_dataset(body.dataset_id, owner_id=current_user)
-    memory.add(body.session_id, 'user', body.message)
+    # Persist user turn across all memory layers
+    memory.add(body.session_id, 'user', body.message, owner_id=current_user, dataset_id=body.dataset_id)
     all_data = {registry.table_name(i.id): i.frame for i in registry.list(owner_id=current_user)}
-    response = planner.respond_with_context(d.id, all_data, body.message, memory.get(body.session_id))
-    memory.add(body.session_id, 'assistant', response.answer)
+    # L1 recent turns + L2 RAG semantic hits
+    recent_history = memory.get(body.session_id)
+    rag_context = memory.get_relevant(body.session_id, body.message)
+    response = planner.respond_with_context(
+        d.id, all_data, body.message, recent_history, rag_context=rag_context
+    )
+    # Save assistant response along with full analysis data (charts, sql, tables)
+    memory.add(
+        body.session_id,
+        'assistant',
+        response.answer,
+        owner_id=current_user,
+        dataset_id=body.dataset_id,
+        analysis_data=response.model_dump(),
+    )
     return response
+
+
+@router.get('/chat/history/{session_id}')
+def get_chat_history(session_id: str, current_user: str = Depends(get_current_user)):
+    """Fetch chat history for a session to restore conversation in UI."""
+    return memory.get(session_id)
+
+
+@router.delete('/chat/history/{session_id}')
+def clear_chat_history(session_id: str, current_user: str = Depends(get_current_user)):
+    """Clear chat history for a session from all memory layers (Redis + Vector + DB)."""
+    memory.clear(session_id=session_id)
+    return {"message": f"Chat history cleared for session '{session_id}'."}
 
 @router.post('/generate-sql', response_model=AnalysisResponse)
 def sql(request: SqlRequest, current_user: str = Depends(get_current_user)):
@@ -192,4 +219,73 @@ def anomalies_async(dataset_id: str, current_user: str = Depends(get_current_use
     job_id = job_manager.submit_job("anomaly_detection", current_user, _task)
     return JobResponse(job_id=job_id, job_type="anomaly_detection", status="processing")
 
+
+# ── Auto-Analysis Insights Endpoints ─────────────────────────────────────────
+
+from app.analytics.auto_analysis import AutoAnalysisEngine
+from app.database.connection import SessionLocal
+from app.database.models import AutoAnalysisReportModel
+from app.schemas.contracts import AutoAnalysisResponse
+
+@router.get('/datasets/{dataset_id}/insights')
+def get_insights(dataset_id: str, current_user: str = Depends(get_current_user)):
+    """Return cached auto-analysis report. Returns status=processing if job is still running."""
+    get_dataset(dataset_id, owner_id=current_user)  # 404 guard
+
+    db = SessionLocal()
+    try:
+        rec = db.query(AutoAnalysisReportModel).filter(
+            AutoAnalysisReportModel.dataset_id == dataset_id
+        ).first()
+        if rec:
+            report = rec.report_json
+            report["status"] = "completed"
+            return report
+    finally:
+        db.close()
+
+    # Check if a background job is still running for this dataset
+    running = [
+        j for j in job_manager._jobs.values()  # type: ignore[union-attr]
+        if j.job_type == "auto_analysis" and j.user_id == current_user and j.status.value in ("pending", "processing")
+    ]
+    if running:
+        return {"status": "processing", "dataset_id": dataset_id}
+
+    return {"status": "not_found", "dataset_id": dataset_id}
+
+
+@router.post('/datasets/{dataset_id}/insights/generate', response_model=JobResponse, status_code=202)
+def generate_insights(dataset_id: str, current_user: str = Depends(get_current_user)):
+    """Trigger (re-)generation of the auto-analysis report as a background job."""
+    d = get_dataset(dataset_id, owner_id=current_user)
+    frame = d.frame.copy()
+    engine = AutoAnalysisEngine()
+
+    def _task():
+        engine.run_and_persist(dataset_id, frame, owner_id=current_user)
+
+    job_id = job_manager.submit_job("auto_analysis", current_user, _task)
+    return JobResponse(job_id=job_id, job_type="auto_analysis", status="processing")
+
+
+@router.delete('/datasets/{dataset_id}/insights')
+def delete_insights(dataset_id: str, current_user: str = Depends(get_current_user)):
+    """Clear the cached auto-analysis report for a dataset."""
+    get_dataset(dataset_id, owner_id=current_user)
+    db = SessionLocal()
+    try:
+        rec = db.query(AutoAnalysisReportModel).filter(
+            AutoAnalysisReportModel.dataset_id == dataset_id
+        ).first()
+        if rec:
+            db.delete(rec)
+            db.commit()
+            return {"message": "Insights report cleared"}
+        return {"message": "No report found"}
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(500, str(exc)) from exc
+    finally:
+        db.close()
 

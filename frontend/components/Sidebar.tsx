@@ -107,6 +107,13 @@ export function Sidebar() {
                   <span className="text-xs opacity-50">⊞</span>
                   <span className="text-xs opacity-70">Explorer</span>
                 </Link>
+                <Link
+                  href={`/insights/${d.id}`}
+                  className={`nav-link ml-4 text-xs ${pathname === `/insights/${d.id}` ? 'active' : ''}`}
+                >
+                  <span className="text-xs">✨</span>
+                  <span className="text-xs opacity-70">Insights</span>
+                </Link>
               </div>
             ))}
           </div>
@@ -116,8 +123,8 @@ export function Sidebar() {
       {/* Footer */}
       <div className="mt-auto pt-6">
         <div className="rounded-xl p-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
-          <p className="text-xs font-semibold" style={{ color: 'var(--accent-cyan)' }}>Powered by Gemini</p>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--text-faint)' }}>gemini-2.5-flash</p>
+          <p className="text-xs font-semibold" style={{ color: 'var(--accent-cyan)' }}>Powered by Gemini + Groq</p>
+          <p className="mt-0.5 text-xs" style={{ color: 'var(--text-faint)' }}>Parallel Multi-Agent Mesh</p>
         </div>
       </div>
     </aside>

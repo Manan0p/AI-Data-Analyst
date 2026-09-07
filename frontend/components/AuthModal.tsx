@@ -14,6 +14,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'login' }:
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -35,7 +36,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'login' }:
     try {
       const res = isLogin
         ? await api.login(email, password)
-        : await api.register(email, password);
+        : await api.register(email, password, name || undefined);
       onSuccess(res.user);
       onClose();
     } catch (err: unknown) {
@@ -46,44 +47,57 @@ export function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'login' }:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div
-        className="w-full max-w-md rounded-2xl p-6 shadow-2xl transition-all"
-        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
-      >
-        <div className="flex items-center justify-between pb-4 border-b border-[var(--border)]">
-          <h3 className="text-lg font-bold text-white">
-            {isLogin ? 'Sign In to InsightForge' : 'Create an Account'}
-          </h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40 backdrop-blur-sm p-space-md">
+      <div className="w-full max-w-md rounded-2xl p-space-xl bg-surface-container-lowest border border-outline-variant/40 shadow-2xl transition-all">
+        <div className="flex items-center justify-between pb-space-sm border-b border-outline-variant/30">
+          <div className="flex items-center gap-space-xs">
+            <span className="material-symbols-outlined text-primary text-[24px]">lock</span>
+            <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface">
+              {isLogin ? 'Sign In to InsightForge' : 'Create an Account'}
+            </h3>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors text-lg"
+            className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg hover:bg-surface-container-low transition-colors"
           >
-            ✕
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
         {error && (
-          <div className="mt-4 p-3 rounded-lg bg-red-950/50 border border-red-500/50 text-red-200 text-xs">
+          <div className="mt-space-md p-space-sm rounded-lg bg-error-container text-error text-body-sm font-medium">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-space-md space-y-space-md">
+          {!isLogin && (
+            <div>
+              <label className="block font-label-md text-label-md font-semibold text-on-surface mb-1">Full Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Dr. Elena Rostova"
+                className="w-full px-space-sm py-2 rounded-lg text-body-sm bg-surface-container-low border border-outline-variant/40 text-on-surface focus:outline-none focus:border-primary focus:bg-white transition-all"
+              />
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1">Email</label>
+            <label className="block font-label-md text-label-md font-semibold text-on-surface mb-1">Email Address</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="analyst@example.com"
-              className="w-full px-3 py-2 rounded-lg text-sm bg-black/40 border border-[var(--border)] text-white focus:outline-none focus:border-cyan-500"
+              placeholder="lead.analyst@example.com"
+              className="w-full px-space-sm py-2 rounded-lg text-body-sm bg-surface-container-low border border-outline-variant/40 text-on-surface focus:outline-none focus:border-primary focus:bg-white transition-all"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1">Password</label>
+            <label className="block font-label-md text-label-md font-semibold text-on-surface mb-1">Password</label>
             <input
               type="password"
               required
@@ -91,27 +105,35 @@ export function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'login' }:
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-3 py-2 rounded-lg text-sm bg-black/40 border border-[var(--border)] text-white focus:outline-none focus:border-cyan-500"
+              className="w-full px-space-sm py-2 rounded-lg text-body-sm bg-surface-container-low border border-outline-variant/40 text-on-surface focus:outline-none focus:border-primary focus:bg-white transition-all"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg font-semibold text-sm text-white shadow-md transition-all flex items-center justify-center gap-2"
-            style={{ background: 'linear-gradient(135deg, #0284c7, #6366f1)' }}
+            className="w-full py-2.5 rounded-lg font-semibold text-label-md text-on-primary bg-primary hover:bg-primary-container disabled:opacity-50 transition-all flex items-center justify-center gap-space-xs shadow-xs"
           >
-            {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
+            {loading ? (
+              <>
+                <span className="material-symbols-outlined text-[18px] animate-spin">sync</span>
+                <span>Authenticating...</span>
+              </>
+            ) : isLogin ? (
+              'Sign In'
+            ) : (
+              'Create Account'
+            )}
           </button>
         </form>
 
-        <div className="mt-4 text-center">
+        <div className="mt-space-md text-center pt-space-xs border-t border-outline-variant/20">
           <button
             onClick={() => {
               setIsLogin(!isLogin);
               setError(null);
             }}
-            className="text-xs text-cyan-400 hover:underline"
+            className="text-body-sm font-medium text-primary hover:underline"
           >
             {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </button>

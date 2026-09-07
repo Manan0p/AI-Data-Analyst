@@ -63,6 +63,24 @@ class CsvIngestionService:
 
         dataset = Dataset(dataset_id, filename, frame, owner_id=owner_id)
         self.registry.add(dataset, owner_id=owner_id)
+
+        # Fire-and-forget: auto-analysis runs in background thread pool
+        try:
+            from app.analytics.auto_analysis import AutoAnalysisEngine
+            from app.services.jobs import job_manager
+            _frame = frame.copy()
+            _did   = dataset_id
+            _oid   = owner_id
+
+            def _analysis_task():
+                AutoAnalysisEngine().run_and_persist(_did, _frame, owner_id=_oid)
+
+            job_manager.submit_job("auto_analysis", owner_id or "anon", _analysis_task)
+        except Exception as exc:
+            # Never block ingestion because of analysis errors
+            import logging
+            logging.getLogger(__name__).warning("Auto-analysis job submission failed: %s", exc)
+
         return dataset
 
     async def ingest(self, upload: UploadFile, owner_id: str | None = None) -> Dataset:
