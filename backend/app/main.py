@@ -43,15 +43,16 @@ app = FastAPI(title=settings.app_name, version='1.0.0', lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-origins = [o.strip() for o in settings.cors_origins.split(',') if o.strip()]
-is_wildcard = '*' in origins or not origins
+# Universal CORS configuration for Vercel preview URLs, production domains, and local dev
+cors_origins_list = [o.strip() for o in settings.cors_origins.split(',') if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'] if is_wildcard else origins,
-    allow_credentials=not is_wildcard,
-    allow_methods=['*'],
-    allow_headers=['*'],
+    allow_origins=cors_origins_list if '*' not in cors_origins_list and cors_origins_list else [],
+    allow_origin_regex=r"^https?://.*",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth_router, prefix='/api/auth', tags=['auth'])

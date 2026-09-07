@@ -10,7 +10,7 @@ from app.config import settings
 from app.database.connection import get_db
 from app.database.models import User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
 def hash_password(password: str) -> str:
@@ -38,25 +38,35 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
-) -> str:
-    """FastAPI dependency to extract and validate the current authenticated user ID."""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired authentication credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+) -> Optional[str]:
+    """FastAPI dependency to extract and validate current user ID. Returns None for guests."""
+    if not token:
+        return None
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         user_id: str = payload.get("sub")
         if user_id is None:
-            raise credentials_exception
+            return None
     except JWTError:
-        raise credentials_exception
+        return None
 
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
-        raise credentials_exception
+        return None
 
     return user.id
+
+
+def require_current_user(
+    current_user_id: Optional[str] = Depends(get_current_user),
+) -> str:
+    """FastAPI dependency enforcing strict authentication."""
+    if not current_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return current_user_id
