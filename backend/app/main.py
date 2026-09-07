@@ -17,8 +17,11 @@ setup_sentry()
 
 logger = logging.getLogger(__name__)
 
-# Create database tables automatically
-Base.metadata.create_all(bind=engine)
+# Create database tables automatically (safe for serverless read-only environments)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as exc:
+    logger.warning("Database schema initialization warning: %s", exc)
 
 
 @asynccontextmanager

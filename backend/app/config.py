@@ -1,5 +1,25 @@
+import os
+import tempfile
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+def _is_serverless() -> bool:
+    return bool(
+        os.environ.get("VERCEL")
+        or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+        or os.environ.get("LAMBDA_TASK_ROOT")
+        or os.environ.get("NOW_REGION")
+    )
+
+def _default_upload_dir() -> Path:
+    if _is_serverless():
+        return Path(tempfile.gettempdir()) / "insightforge" / "uploads"
+    return Path("data/uploads")
+
+def _default_db_url() -> str:
+    if _is_serverless():
+        return f"sqlite:///{Path(tempfile.gettempdir()) / 'insightforge.db'}"
+    return "sqlite:///./insightforge.db"
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -9,10 +29,10 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
     groq_api_key: str | None = None
     groq_model: str = "llama-3.1-8b-instant"
-    upload_dir: Path = Path("data/uploads")
+    upload_dir: Path = _default_upload_dir()
     max_upload_mb: int = 25
     max_row_count: int = 500_000
-    database_url: str = "sqlite:///./insightforge.db"
+    database_url: str = _default_db_url()
     jwt_secret: str = "insightforge-insecure-dev-secret-replace-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24

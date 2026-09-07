@@ -26,7 +26,20 @@ class DatasetRegistry:
         self._cache: dict[str, Dataset] = {}
         self._lock = RLock()
         self.upload_dir: Path = settings.upload_dir
-        self.upload_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.upload_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            import tempfile
+            logger.warning(
+                "Could not create upload_dir (%s): %s. Falling back to temp directory.",
+                self.upload_dir,
+                exc,
+            )
+            self.upload_dir = Path(tempfile.gettempdir()) / "insightforge" / "uploads"
+            try:
+                self.upload_dir.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                logger.warning("Could not create temp upload_dir: %s. Operating in memory-only mode.", e)
 
     def add(self, dataset: Dataset, owner_id: str | None = None):
         with self._lock:
@@ -34,10 +47,15 @@ class DatasetRegistry:
             dataset.owner_id = effective_owner
             self._cache[dataset.id] = dataset
 
-            # 1. Persist CSV payload to storage volume
-            csv_path = self.upload_dir / f"{dataset.id}.csv"
-            dataset.frame.to_csv(csv_path, index=False)
-            storage_key = str(csv_path)
+            # 1. Persist CSV payload to storage volume (if writable)
+            storage_key = f"in-memory://{dataset.id}"
+            try:
+                self.upload_dir.mkdir(parents=True, exist_ok=True)
+                csv_path = self.upload_dir / f"{dataset.id}.csv"
+                dataset.frame.to_csv(csv_path, index=False)
+                storage_key = str(csv_path)
+            except Exception as exc:
+                logger.warning("Could not persist CSV file to disk (%s): %s. Keeping in memory.", self.upload_dir, exc)
 
             # 2. Persist metadata to database
             db = SessionLocal()
