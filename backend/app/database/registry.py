@@ -41,17 +41,30 @@ class DatasetRegistry:
             except Exception as e:
                 logger.warning("Could not create temp upload_dir: %s. Operating in memory-only mode.", e)
 
+    def _storage_path(self, storage_key: str) -> Path | None:
+        if storage_key.startswith("in-memory://"):
+            return None
+        candidate = Path(storage_key)
+        if candidate.is_absolute() or candidate.exists():
+            return candidate
+        return (self.upload_dir / candidate).resolve()
+
     def add(self, dataset: Dataset, owner_id: str | None = None):
         with self._lock:
             effective_owner = owner_id or dataset.owner_id
+            if effective_owner is None:
+                logger.warning("Adding dataset %s without an owner; authenticated routes will not expose it.", dataset.id)
             dataset.owner_id = effective_owner
-            self._cache[dataset.id] = dataset
+
+            cached = self._cache.get(dataset.id)
+            if cached and cached.owner_id != effective_owner:
+                raise ValueError(f"Dataset ID collision for '{dataset.id}'")
 
             # 1. Persist CSV payload to storage volume (if writable)
             storage_key = f"in-memory://{dataset.id}"
             try:
                 self.upload_dir.mkdir(parents=True, exist_ok=True)
-                csv_path = self.upload_dir / f"{dataset.id}.csv"
+                csv_path = (self.upload_dir / f"{dataset.id}.csv").resolve()
                 dataset.frame.to_csv(csv_path, index=False)
                 storage_key = str(csv_path)
             except Exception as exc:
@@ -63,6 +76,8 @@ class DatasetRegistry:
                 schema_dict = {str(col): str(dataset.frame[col].dtype) for col in dataset.frame.columns}
                 existing = db.query(DatasetModel).filter(DatasetModel.id == dataset.id).first()
                 if existing:
+                    if existing.owner_id != effective_owner:
+                        raise ValueError(f"Dataset ID collision for '{dataset.id}'")
                     existing.owner_id = effective_owner
                     existing.filename = dataset.name
                     existing.storage_key = storage_key
@@ -82,15 +97,19 @@ class DatasetRegistry:
             except Exception as exc:
                 db.rollback()
                 logger.warning("Failed to persist dataset metadata to database: %s", exc)
+                if isinstance(exc, ValueError) and "collision" in str(exc).lower():
+                    raise
             finally:
                 db.close()
+
+            self._cache[dataset.id] = dataset
 
     def get(self, dataset_id: str, owner_id: str | None = None) -> Dataset:
         with self._lock:
             # 1. Check in-memory fast cache
             if dataset_id in self._cache:
                 item = self._cache[dataset_id]
-                if owner_id is not None and item.owner_id is not None and item.owner_id != owner_id:
+                if owner_id is not None and item.owner_id != owner_id:
                     raise KeyError(f"Dataset '{dataset_id}' was not found")
                 return item
 
@@ -99,12 +118,14 @@ class DatasetRegistry:
             try:
                 query = db.query(DatasetModel).filter(DatasetModel.id == dataset_id)
                 if owner_id is not None:
-                    query = query.filter((DatasetModel.owner_id == owner_id) | (DatasetModel.owner_id.is_(None)))
+                    query = query.filter(DatasetModel.owner_id == owner_id)
                 rec = query.first()
                 if not rec:
                     raise KeyError(f"Dataset '{dataset_id}' was not found")
 
-                storage_path = Path(rec.storage_key)
+                storage_path = self._storage_path(rec.storage_key)
+                if storage_path is None:
+                    raise KeyError(f"Dataset file for '{dataset_id}' is not persisted")
                 if not storage_path.exists():
                     raise KeyError(f"Dataset file for '{dataset_id}' not found on storage")
 
@@ -122,12 +143,12 @@ class DatasetRegistry:
             try:
                 query = db.query(DatasetModel).filter(DatasetModel.id == dataset_id)
                 if owner_id is not None:
-                    query = query.filter((DatasetModel.owner_id == owner_id) | (DatasetModel.owner_id.is_(None)))
+                    query = query.filter(DatasetModel.owner_id == owner_id)
                 rec = query.first()
                 if rec:
                     found = True
-                    storage_path = Path(rec.storage_key)
-                    if storage_path.exists():
+                    storage_path = self._storage_path(rec.storage_key)
+                    if storage_path and storage_path.exists():
                         try:
                             storage_path.unlink()
                         except Exception:
@@ -142,7 +163,7 @@ class DatasetRegistry:
 
             if dataset_id in self._cache:
                 item = self._cache[dataset_id]
-                if owner_id is not None and item.owner_id is not None and item.owner_id != owner_id:
+                if owner_id is not None and item.owner_id != owner_id:
                     return False
                 del self._cache[dataset_id]
                 found = True
@@ -156,14 +177,14 @@ class DatasetRegistry:
             try:
                 query = db.query(DatasetModel)
                 if owner_id is not None:
-                    query = query.filter((DatasetModel.owner_id == owner_id) | (DatasetModel.owner_id.is_(None)))
+                    query = query.filter(DatasetModel.owner_id == owner_id)
                 records = query.all()
                 for rec in records:
                     if rec.id in self._cache:
                         datasets.append(self._cache[rec.id])
                     else:
-                        storage_path = Path(rec.storage_key)
-                        if storage_path.exists():
+                        storage_path = self._storage_path(rec.storage_key)
+                        if storage_path and storage_path.exists():
                             frame = pd.read_csv(storage_path)
                             ds = Dataset(id=rec.id, name=rec.filename, frame=frame, owner_id=rec.owner_id)
                             self._cache[rec.id] = ds
@@ -172,7 +193,7 @@ class DatasetRegistry:
             except Exception as exc:
                 logger.warning("Failed to list datasets from DB; falling back to cache: %s", exc)
                 if owner_id is not None:
-                    return [d for d in self._cache.values() if d.owner_id is None or d.owner_id == owner_id]
+                    return [d for d in self._cache.values() if d.owner_id == owner_id]
                 return list(self._cache.values())
             finally:
                 db.close()
@@ -187,8 +208,8 @@ class DatasetRegistry:
                     query = query.filter(DatasetModel.owner_id == owner_id)
                 recs = query.all()
                 for rec in recs:
-                    storage_path = Path(rec.storage_key)
-                    if storage_path.exists():
+                    storage_path = self._storage_path(rec.storage_key)
+                    if storage_path and storage_path.exists():
                         try:
                             storage_path.unlink()
                         except Exception:

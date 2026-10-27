@@ -44,9 +44,10 @@ export const authStorage = {
 };
 
 async function rehydrateDataset(dataset_id: string | null): Promise<boolean> {
-  let stored = dataset_id ? sessionStore.get(dataset_id) : null;
+  const ownerId = authStorage.getUser()?.id;
+  let stored = dataset_id ? sessionStore.get(dataset_id, ownerId) : null;
   if (!stored) {
-    const all = sessionStore.getAll();
+    const all = sessionStore.getAll(ownerId);
     if (all.length === 0) return false;
     stored = all[0];
   }
@@ -58,6 +59,7 @@ async function rehydrateDataset(dataset_id: string | null): Promise<boolean> {
     const headers: Record<string, string> = {};
     const token = authStorage.getToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (dataset_id) headers['X-Dataset-ID'] = dataset_id;
     const res = await fetch(base + '/upload', { method: 'POST', body: formData, headers });
     return res.ok;
   } catch {
@@ -104,8 +106,14 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
     const body = await r.json().catch(() => ({ detail: r.statusText }));
     const errorMsg = String(body.detail ?? r.statusText);
 
+    if (r.status === 401 && typeof window !== 'undefined') {
+      authStorage.clear();
+      window.dispatchEvent(new CustomEvent('insightforge-auth-expired'));
+    }
+
     // Re-seed stateless Vercel Serverless Lambda worker seamlessly if dataset was purged
-    if ((r.status === 404 || r.status === 400 || errorMsg.includes('not found')) && !isRetry) {
+    const storageMissing = errorMsg.includes('not found on storage') || errorMsg.includes('not persisted');
+    if (r.status === 404 && storageMissing && !isRetry) {
       const dataset_id = extractDatasetId(path, mergedInit, errorMsg);
       const ok = await rehydrateDataset(dataset_id);
       if (ok) {
@@ -122,7 +130,7 @@ export const api = {
   datasets: async () => {
     let list = await request<Dataset[]>('/datasets');
     if (list.length === 0) {
-      const stored = sessionStore.getAll();
+      const stored = sessionStore.getAll(authStorage.getUser()?.id);
       if (stored.length > 0) {
         for (const s of stored) {
           await rehydrateDataset(s.id);
@@ -147,7 +155,7 @@ export const api = {
     for (const ds of result) {
       const match = fileTexts.find(t => t.name === ds.name);
       if (match) {
-        sessionStore.save({ id: ds.id, name: ds.name, csvContent: match.text });
+        sessionStore.save({ id: ds.id, name: ds.name, csvContent: match.text }, authStorage.getUser()?.id);
       }
     }
 
@@ -155,12 +163,12 @@ export const api = {
   },
 
   deleteDataset: async (id: string) => {
-    sessionStore.remove(id);
+    sessionStore.remove(id, authStorage.getUser()?.id);
     return request<{ message: string }>(`/datasets/${id}`, { method: 'DELETE' });
   },
 
   deleteAllDatasets: async () => {
-    sessionStore.clear();
+    sessionStore.clear(authStorage.getUser()?.id);
     return request<{ message: string }>('/datasets', { method: 'DELETE' });
   },
 
@@ -171,11 +179,11 @@ export const api = {
       `/datasets/${id}/rows?search=${encodeURIComponent(search)}`
     ),
 
-  chat: (dataset_id: string, message: string, session_id?: string) =>
+  chat: (dataset_id: string, message: string, session_id: string) =>
     request<Analysis>('/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataset_id, message, session_id }),
+    body: JSON.stringify({ dataset_id, message, session_id }),
     }),
 
   chatHistory: (session_id: string) =>
@@ -228,6 +236,7 @@ export const api = {
   },
 
   logout: () => {
+    sessionStore.clear(authStorage.getUser()?.id);
     authStorage.clear();
   },
 

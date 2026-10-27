@@ -73,3 +73,15 @@ def test_dataset_deletion_removes_db_and_storage_file():
     # Must no longer be retrievable
     with pytest.raises(KeyError):
         registry.get(dataset_id, owner_id="user_del")
+
+
+def test_chat_history_is_scoped_to_owner():
+    session_id = f"scoped_{uuid.uuid4().hex[:8]}"
+    memory.add(session_id, "user", "private question", owner_id="owner_a", dataset_id="dataset_a")
+    memory.add(session_id, "assistant", "private answer", owner_id="owner_a", dataset_id="dataset_a")
+
+    assert memory.get(session_id, owner_id="owner_a")
+    assert memory.get(session_id, owner_id="owner_b") == []
+    memory.clear(session_id, owner_id="owner_b")
+    assert memory.get(session_id, owner_id="owner_a")
+    memory.clear(session_id, owner_id="owner_a")

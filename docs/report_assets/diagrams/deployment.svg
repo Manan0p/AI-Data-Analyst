@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<text x="55" y="48" font-family="Arial" font-size="27" font-weight="700" fill="#17324d">Deployment architecture and operational boundary</text>
+<text x="55" y="76" font-family="Arial" font-size="16" fill="#475569">Local evaluation is supported by SQLite; PostgreSQL and optional providers are configuration-dependent.</text>
+<rect x="55" y="300" width="260" height="180" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="73" y="334" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Browser</text>
+<text x="73" y="368" font-family="Arial" font-size="17" fill="#1e293b">Next.js UI</text>
+<text x="73" y="393" font-family="Arial" font-size="17" fill="#1e293b">local or hosted</text>
+<rect x="470" y="240" width="350" height="300" rx="14" fill="#e8f1f8" stroke="#17324d" stroke-width="3"/>
+<text x="488" y="274" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">FastAPI backend</text>
+<text x="488" y="308" font-family="Arial" font-size="17" fill="#1e293b">auth / routes</text>
+<text x="488" y="333" font-family="Arial" font-size="17" fill="#1e293b">analytics / tools</text>
+<text x="488" y="358" font-family="Arial" font-size="17" fill="#1e293b">JobManager</text>
+<text x="488" y="383" font-family="Arial" font-size="17" fill="#1e293b">structured logging</text>
+<rect x="1050" y="100" width="300" height="170" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="1068" y="134" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">SQLite / PostgreSQL</text>
+<text x="1068" y="168" font-family="Arial" font-size="17" fill="#1e293b">users / datasets</text>
+<text x="1068" y="193" font-family="Arial" font-size="17" fill="#1e293b">sessions / reports</text>
+<rect x="1050" y="350" width="300" height="170" rx="14" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
+<text x="1068" y="384" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">File storage</text>
+<text x="1068" y="418" font-family="Arial" font-size="17" fill="#1e293b">data/uploads/{id}.csv</text>
+<text x="1068" y="443" font-family="Arial" font-size="17" fill="#1e293b">local volume</text>
+<rect x="1050" y="600" width="300" height="170" rx="14" fill="#fefce8" stroke="#b45309" stroke-width="3"/>
+<text x="1068" y="634" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Optional services</text>
+<text x="1068" y="668" font-family="Arial" font-size="17" fill="#1e293b">Gemini</text>
+<text x="1068" y="693" font-family="Arial" font-size="17" fill="#1e293b">Upstash Redis</text>
+<text x="1068" y="718" font-family="Arial" font-size="17" fill="#1e293b">Upstash Vector</text>
+<line x1="315" y1="390" x2="470" y2="390" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="392" y="382" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">HTTP / JSON</text>
+<line x1="820" y1="330" x2="1050" y2="185" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="935" y="249" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">metadata</text>
+<line x1="820" y1="450" x2="1050" y2="435" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="935" y="434" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">CSV payload</text>
+<line x1="820" y1="505" x2="1050" y2="685" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)" stroke-dasharray="9 7"/>
+<text x="935" y="587" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">when configured</text>
+<text x="55" y="690" font-family="Arial" font-size="18" fill="#475569">Not claimed: durable distributed workers, object storage, enterprise SSO, or compliance certification.</text>
+</svg>

@@ -3,11 +3,13 @@ import logging
 import pandas as pd
 
 from app.analytics.anomalies import AnomalyService
+from app.analytics.auto_analysis import AutoAnalysisEngine
 from app.analytics.profiler import ProfileService
 from app.charts.factory import ChartFactory
 from app.config import settings
 from app.database.registry import DatasetRegistry
 from app.schemas.contracts import AnalysisResponse
+from app.analytics.understanding import DataUnderstandingEngine
 from app.tools.pandas_tool import PandasTool
 from app.tools.sql_tool import sql_tool
 
@@ -83,8 +85,140 @@ class PlannerAgent:
         self.profile = ProfileService()
         self.anomalies = AnomalyService()
         self.charts = ChartFactory()
+        self.auto_analysis = AutoAnalysisEngine()
+
+    @staticmethod
+    def _find_column(frame: pd.DataFrame, terms: tuple[str, ...], exclude: set[str] | None = None) -> str | None:
+        exclude = exclude or set()
+        ranked: list[tuple[int, str]] = []
+        for col in frame.columns:
+            name = str(col)
+            if name in exclude:
+                continue
+            lowered = name.lower().replace("_", " ")
+            score = sum(2 if term in lowered else 0 for term in terms)
+            if score:
+                ranked.append((score, name))
+        return max(ranked, key=lambda item: item[0])[1] if ranked else None
+
+    def _answer_business_question(self, dataset_id: str, frame: pd.DataFrame, message: str) -> AnalysisResponse | None:
+        """Answer common business questions deterministically from validated evidence."""
+        lower = message.lower()
+        understanding = DataUnderstandingEngine().run(frame)
+        working = understanding["frame"]
+        metrics = understanding["metric_columns"]
+        date_col = understanding.get("date_column")
+        numeric = understanding.get("measures", [])
+        revenue = metrics.get("revenue") or metrics.get("primary")
+        profit = metrics.get("profit")
+
+        if any(term in lower for term in ("executive summary", "key metrics", "overview", "what can you tell")):
+            report = self.auto_analysis.run(dataset_id, working)
+            return AnalysisResponse(
+                answer=report.executive_summary,
+                reasoning="The deterministic insight engine classified the dataset and grounded the summary in computed metrics.",
+                confidence=0.94,
+                assumptions=[f"Detected domain: {report.domain} ({report.domain_confidence:.0%} confidence)."],
+                limitations=report.data_quality.warnings[:3],
+                insights=[card.body for card in report.insights[:5]],
+                metadata={"tool": "executive_summary", "planner": "deterministic", "report": report.model_dump()},
+            )
+
+        if any(term in lower for term in ("anomal", "outlier")):
+            items = self.anomalies.detect(working)
+            return AnalysisResponse(
+                answer=f"Found {len(items)} potential anomalies across the meaningful numeric measures.",
+                reasoning="Isolation Forest evaluated numeric measures after excluding identifier-like columns.",
+                confidence=0.86,
+                limitations=["Anomalies are statistical signals, not proof of business error."],
+                anomalies=items,
+                metadata={"tool": "anomaly", "planner": "deterministic"},
+            )
+
+        if any(term in lower for term in ("profile", "null", "missing", "duplicate", "schema")):
+            p = self.profile.profile(dataset_id, working)
+            return AnalysisResponse(
+                answer=f"This dataset contains {p.rows:,} {understanding['grain']} records across {p.columns} columns, with {p.duplicate_rows:,} duplicate rows.",
+                reasoning="The dataset understanding layer inspected structure, grain, missingness, and meaningful column types.",
+                confidence=0.98,
+                limitations=["Column semantics are inferred from names, types, and distributions."],
+                metadata={"tool": "profile", "planner": "deterministic", "profile": p.model_dump(), "understanding": {k: v for k, v in understanding.items() if k != "frame"}},
+            )
+
+        is_time_query = any(term in lower for term in ("monthly", "month", "over time", "trend", "peak period", "worst period"))
+
+        # Ranking questions: “top products/categories/regions by sales/profit”.
+        if not is_time_query and any(term in lower for term in ("top", "highest", "best", "lowest", "worst")):
+            if "categor" in lower:
+                preferred_dimension_terms = ["sub-category", "category"] if "sub-category" in lower else ["category", "sub-category"]
+            elif "product" in lower:
+                preferred_dimension_terms = ["product"]
+            else:
+                preferred_dimension_terms = [
+                    term for term in ("region", "state", "city", "segment", "channel", "campaign", "customer")
+                    if term in lower
+                ]
+            dimension = None
+            for term in preferred_dimension_terms:
+                normalized_term = term.lower().replace("_", " ")
+                dimension = next((col for col in understanding["dimensions"] if col.lower().replace("_", " ").strip() == normalized_term), None)
+                if not dimension:
+                    dimension = next((col for col in understanding["dimensions"] if term in col.lower()), None)
+                if dimension:
+                    break
+            dimension = dimension or (understanding["dimensions"][0] if understanding["dimensions"] else None)
+            measure = profit if any(term in lower for term in ("profit", "margin")) else revenue
+            if measure is None:
+                measure = numeric[0] if numeric else None
+            if dimension and measure:
+                temp = working[[dimension, measure]].copy()
+                temp[measure] = pd.to_numeric(temp[measure], errors="coerce")
+                grouped = temp.dropna().groupby(dimension)[measure].agg(["sum", "mean", "count"])
+                descending = not any(term in lower for term in ("lowest", "worst"))
+                grouped = grouped.sort_values("sum", ascending=not descending).head(5)
+                rows = [{dimension: str(idx), f"total_{measure}": float(row["sum"]), "records": int(row["count"])} for idx, row in grouped.iterrows()]
+                direction = "highest" if descending else "lowest"
+                answer = f"The {direction} {measure} values are led by {rows[0][dimension]} at {rows[0][f'total_{measure}']:,.2f}."
+                chart = _build_chart_from_rows(rows, "bar", x_hint=dimension, y_hint=f"total_{measure}")
+                return AnalysisResponse(
+                    answer=answer,
+                    reasoning=f"Grouped {measure} by {dimension}, sorted by total, and returned the top five groups.",
+                    confidence=0.97,
+                    generated_sql=f"SELECT {dimension}, SUM({measure}) AS total_{measure}, COUNT(*) AS records FROM {DatasetRegistry.table_name(dataset_id)} GROUP BY {dimension} ORDER BY total_{measure} {'DESC' if descending else 'ASC'} LIMIT 5",
+                    chart=chart,
+                    data=rows,
+                    metadata={"tool": "sql", "planner": "deterministic", "rows": rows, "dimension": dimension, "measure": measure},
+                )
+
+        if is_time_query and date_col and revenue:
+            temp = working[[date_col, revenue] + ([profit] if profit else [])].copy()
+            temp[date_col] = pd.to_datetime(temp[date_col], errors="coerce")
+            for col in [revenue, profit]:
+                if col:
+                    temp[col] = pd.to_numeric(temp[col], errors="coerce")
+            temp = temp.dropna(subset=[date_col, revenue])
+            temp["period"] = temp[date_col].dt.to_period("M").astype(str)
+            grouped = temp.groupby("period").agg(**{"sales": (revenue, "sum"), **({"profit": (profit, "sum")} if profit else {})}).sort_index()
+            if not grouped.empty:
+                peak = grouped["sales"].idxmax()
+                worst = grouped["sales"].idxmin()
+                rows = [{"period": idx, **{key: float(value) for key, value in row.items()}} for idx, row in grouped.iterrows()]
+                chart = _build_chart_from_rows(rows, "line", x_hint="period", y_hint="sales")
+                return AnalysisResponse(
+                    answer=f"Peak sales occurred in {peak} at {grouped.loc[peak, 'sales']:,.2f}; the weakest month was {worst} at {grouped.loc[worst, 'sales']:,.2f}.",
+                    reasoning=f"Parsed {date_col} as the primary time column and aggregated {revenue} monthly.",
+                    confidence=0.96,
+                    chart=chart,
+                    data=rows,
+                    metadata={"tool": "trend", "planner": "deterministic", "rows": rows, "date_column": date_col},
+                )
+
+        return None
 
     def respond(self, dataset_id: str, frame: pd.DataFrame, message: str) -> AnalysisResponse:
+        business_response = self._answer_business_question(dataset_id, frame, message)
+        if business_response is not None:
+            return business_response
         prompt = message.lower()
         if any(w in prompt for w in ("anomal", "outlier")):
             items = self.anomalies.detect(frame)
@@ -105,20 +239,16 @@ class PlannerAgent:
                 confidence=0.99,
                 metadata={"tool": "profile", "planner": "deterministic", "profile": p.model_dump()},
             )
-        numeric = frame.select_dtypes(include="number")
-        if numeric.empty:
-            answer = f"{len(frame):,} rows are available. Ask about a specific column to analyse it."
-        else:
-            top = numeric.mean().sort_values(ascending=False).index[0]
-            answer = f"The largest numeric average is **{top}** at {numeric[top].mean():,.2f}."
+        report = self.auto_analysis.run(dataset_id, frame)
+        answer = report.executive_summary
         return AnalysisResponse(
             answer=answer,
-            reasoning="The fallback planner selected descriptive statistics as the safest fit for this general question.",
-            confidence=0.74,
-            assumptions=["Column means are meaningful for the question."],
-            limitations=["No semantic business definitions were provided."],
-            insights=[answer],
-            metadata={"tool": "statistics", "planner": "deterministic"},
+            reasoning="The fallback planner used the semantic dataset understanding and deterministic insight engine instead of treating every numeric column as a business measure.",
+            confidence=0.9,
+            assumptions=[f"Detected domain: {report.domain} ({report.domain_confidence:.0%} confidence)."],
+            limitations=report.data_quality.warnings[:3],
+            insights=[card.body for card in report.insights[:5]],
+            metadata={"tool": "executive_summary", "planner": "deterministic", "report": report.model_dump()},
         )
 
 
@@ -174,6 +304,13 @@ class GeminiPlannerAgent(PlannerAgent):
         primary = datasets.get(primary_key)
         if primary is None:
             primary = next(iter(datasets.values())) if datasets else pd.DataFrame()
+
+        # Prefer grounded deterministic answers for common business questions.
+        # This prevents provider latency/outages from turning a clear request
+        # into a generic numeric-average response.
+        deterministic = self._answer_business_question(primary_id, primary, message)
+        if deterministic is not None:
+            return deterministic
 
         if not settings.gemini_api_key:
             return self.respond(primary_id, primary, message)

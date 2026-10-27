@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { use, useState } from 'react';
 import { api } from '@/services/api';
 import { AutoAnalysis, InsightCard as InsightCardType } from '@/types/insights';
+import { useAuth } from '@/store/useAuth';
 
 const Chart = dynamic(() => import('@/components/Chart'), { ssr: false });
 
@@ -16,9 +17,10 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
   const [activeChartTab, setActiveChartTab] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: datasets } = useQuery({ queryKey: ['datasets'], queryFn: api.datasets });
+  const { user } = useAuth();
+  const { data: datasets } = useQuery({ queryKey: ['datasets', user?.id], queryFn: api.datasets, enabled: !!user });
   const { data: report, isLoading, error } = useQuery<AutoAnalysis>({
-    queryKey: ['insights', id],
+    queryKey: ['insights', user?.id, id],
     queryFn: () => api.insights(id),
     refetchInterval: (query) => {
       const data = query.state.data;
@@ -131,6 +133,12 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
               Retry Analysis
             </button>
           </div>
+        ) : report?.status === 'processing' ? (
+          <div className="p-space-2xl text-center rounded-xl bg-surface-container-lowest border border-outline-variant/30">
+            <span className="material-symbols-outlined text-[40px] text-primary animate-spin">sync</span>
+            <p className="font-headline-sm text-headline-sm mt-space-xs font-bold">Generating grounded insights…</p>
+            <p className="font-body-md text-body-md text-on-surface-variant mt-space-xs">The dataset is being profiled and checked for domain-specific findings.</p>
+          </div>
         ) : (
           <>
             {/* 2. Autonomous Narrative Synopsis Hero Banner */}
@@ -145,8 +153,8 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
                     <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">
                       Autonomous Narrative Synopsis
                     </h2>
-                    <span className="px-space-xs py-space-3xs rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-semibold">
-                      High Confidence (99.2%)
+                     <span className="px-space-xs py-space-3xs rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-semibold">
+                       {report?.domain || 'Generic'} · {Math.round((report?.domain_confidence || 0) * 100)}% domain confidence
                     </span>
                   </div>
                   <p className="font-body-lg text-body-lg text-on-surface leading-relaxed max-w-4xl">
@@ -168,8 +176,12 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
                     Dataset Integrity Status
                   </span>
                   <div className="flex items-center gap-space-2xs">
-                    <span className="material-symbols-outlined text-tertiary text-[20px]">check_circle</span>
-                    <span className="font-headline-sm text-headline-sm text-tertiary font-bold">Production Ready</span>
+                     <span className={`material-symbols-outlined text-[20px] ${quality && quality.health_score < 90 ? 'text-error' : 'text-tertiary'}`}>
+                       {quality && quality.health_score < 90 ? 'warning' : 'check_circle'}
+                     </span>
+                     <span className={`font-headline-sm text-headline-sm font-bold ${quality && quality.health_score < 90 ? 'text-error' : 'text-tertiary'}`}>
+                       {quality && quality.health_score < 90 ? 'Review Recommended' : 'Ready for Analysis'}
+                     </span>
                   </div>
                   <span className="font-code-sm text-code-sm text-on-surface-variant">
                     {quality?.total_rows?.toLocaleString() || dataset?.rows.toLocaleString()} Rows Evaluated
@@ -186,17 +198,17 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
                   <span className="font-code-sm text-code-sm text-on-surface-variant uppercase font-medium tracking-wide">
                     {report?.insights?.[0]?.title || 'Total Rows'}
                   </span>
-                  <span className="px-space-xs py-space-3xs rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-semibold">
-                    Trend
+                   <span className="px-space-xs py-space-3xs rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-semibold">
+                     {report?.insights?.[0]?.severity || 'info'}
                   </span>
                 </div>
-                <div className="flex items-baseline justify-between my-space-xs">
+                   <div className="flex items-baseline justify-between my-space-xs">
                   <span className="font-display-sm text-display-sm text-on-surface font-bold tracking-tight">
                     {report?.insights?.[0]?.metric || quality?.total_rows?.toLocaleString() || '100%'}
                   </span>
-                  <div className="flex items-center text-tertiary font-code-sm text-code-sm font-semibold bg-tertiary-fixed-dim/20 px-space-xs py-space-3xs rounded">
-                    <span className="material-symbols-outlined text-[14px]">north_east</span>
-                    <span>Optimal</span>
+                   <div className={`flex items-center font-code-sm text-code-sm font-semibold px-space-xs py-space-3xs rounded ${report?.insights?.[0]?.severity === 'critical' ? 'text-error bg-error-container' : report?.insights?.[0]?.severity === 'warning' ? 'text-secondary bg-secondary-fixed/30' : 'text-tertiary bg-tertiary-fixed-dim/20'}`}>
+                     <span className="material-symbols-outlined text-[14px]">{report?.insights?.[0]?.severity === 'critical' ? 'warning' : 'north_east'}</span>
+                     <span>{report?.insights?.[0]?.severity || 'info'}</span>
                   </div>
                 </div>
                 <div className="h-8 w-full mt-space-xs flex items-end">
@@ -378,6 +390,9 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
                               <span>{card.metric}</span>
                             </div>
                           )}
+                          {card.recommendation && (
+                            <p className="mt-space-xs font-body-sm text-body-sm text-primary">Action: {card.recommendation}</p>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -419,6 +434,11 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
                       </div>
                     ))}
                   </div>
+                  {quality?.warnings && quality.warnings.length > 0 && (
+                    <div className="mt-space-md p-space-sm rounded-lg bg-secondary-fixed/30 text-on-surface-variant font-body-sm">
+                      {quality.warnings.slice(0, 3).map((warning) => <p key={warning}>• {warning}</p>)}
+                    </div>
+                  )}
                 </div>
 
                 {/* Anomaly Callout Card */}
@@ -466,6 +486,14 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
                       </Link>
                     ))}
                   </div>
+                  {report?.actions && report.actions.length > 0 && (
+                    <div className="mt-space-md pt-space-md border-t border-outline-variant/20">
+                      <p className="font-label-sm uppercase text-on-surface-variant mb-space-xs">Recommended actions</p>
+                      {report.actions.slice(0, 4).map((item, idx) => (
+                        <p key={`${item.action}-${idx}`} className="font-body-sm text-on-surface-variant mb-1">{idx + 1}. {item.action}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

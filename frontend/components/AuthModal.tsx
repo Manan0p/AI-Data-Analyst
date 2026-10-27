@@ -6,7 +6,7 @@ import { api, User } from '@/services/api';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (user: User) => void;
+  onSuccess: (user: User, token: string) => void;
   initialMode?: 'login' | 'register';
 }
 
@@ -37,7 +37,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'login' }:
       const res = isLogin
         ? await api.login(email, password)
         : await api.register(email, password, name || undefined);
-      onSuccess(res.user);
+      onSuccess(res.user, res.access_token);
       onClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Authentication failed');

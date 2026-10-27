@@ -3,19 +3,25 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { useAuth } from '@/store/useAuth';
 
 export function Navbar() {
   const pathname = usePathname();
   const { user, openAuthModal, logout } = useAuth();
-  const { data: datasets } = useQuery({ queryKey: ['datasets'], queryFn: api.datasets });
+  const queryClient = useQueryClient();
+  const { data: datasets } = useQuery({ queryKey: ['datasets', user?.id], queryFn: api.datasets, enabled: !!user });
 
   const currentPath = pathname || '/';
   const pathParts = currentPath.split('/');
   const routeDatasetId = pathParts.length > 2 ? pathParts[2] : null;
   const activeDatasetId = routeDatasetId || datasets?.[0]?.id;
+
+  function handleLogout() {
+    logout();
+    queryClient.clear();
+  }
 
   const navItems = [
     { label: 'Datasets', href: '/', isActive: currentPath === '/' },
@@ -107,7 +113,7 @@ export function Navbar() {
                 <span className="font-body-sm text-body-sm text-on-surface-variant">Data Lead</span>
               </div>
               <button
-                onClick={logout}
+                 onClick={handleLogout}
                 title="Logout"
                 className="p-1 rounded text-on-surface-variant hover:text-error hover:bg-surface-container-low transition-colors"
               >

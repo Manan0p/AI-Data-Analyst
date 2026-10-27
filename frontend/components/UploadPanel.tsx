@@ -20,7 +20,7 @@ export function UploadPanel() {
       const datasets = await api.upload(files);
       setUploaded(datasets.map(d => d.name));
       await queryClient.invalidateQueries({ queryKey: ['datasets'] });
-      if (datasets[0]) router.push(`/analyse/${datasets[0].id}`);
+       if (datasets[0]) router.push(`/insights/${datasets[0].id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed');
     } finally {

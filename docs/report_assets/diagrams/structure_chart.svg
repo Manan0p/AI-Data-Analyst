@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<text x="55" y="48" font-family="Arial" font-size="27" font-weight="700" fill="#17324d">Structure chart and work-breakdown structure</text>
+<text x="55" y="76" font-family="Arial" font-size="16" fill="#475569">Repository modules are grouped by responsibility, not deployed as separate microservices.</text>
+<rect x="640" y="95" width="320" height="105" rx="14" fill="#e8f1f8" stroke="#17324d" stroke-width="3"/>
+<text x="658" y="129" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">InsightForge</text>
+<text x="658" y="163" font-family="Arial" font-size="17" fill="#1e293b">end-to-end application</text>
+<rect x="65" y="300" width="245" height="180" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="83" y="334" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Frontend</text>
+<text x="83" y="368" font-family="Arial" font-size="17" fill="#1e293b">App Router pages</text>
+<text x="83" y="393" font-family="Arial" font-size="17" fill="#1e293b">Components / state</text>
+<text x="83" y="418" font-family="Arial" font-size="17" fill="#1e293b">API client</text>
+<line x1="800" y1="200" x2="187" y2="300" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="360" y="300" width="245" height="180" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="378" y="334" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">API + identity</text>
+<text x="378" y="368" font-family="Arial" font-size="17" fill="#1e293b">FastAPI routes</text>
+<text x="378" y="393" font-family="Arial" font-size="17" fill="#1e293b">JWT / rate limits</text>
+<text x="378" y="418" font-family="Arial" font-size="17" fill="#1e293b">Pydantic contracts</text>
+<line x1="800" y1="200" x2="482" y2="300" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="655" y="300" width="245" height="180" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="673" y="334" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Data + persistence</text>
+<text x="673" y="368" font-family="Arial" font-size="17" fill="#1e293b">Ingestion</text>
+<text x="673" y="393" font-family="Arial" font-size="17" fill="#1e293b">Registry / DB</text>
+<text x="673" y="418" font-family="Arial" font-size="17" fill="#1e293b">Memory layers</text>
+<line x1="800" y1="200" x2="777" y2="300" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="950" y="300" width="245" height="180" rx="14" fill="#ecfdf5" stroke="#0f766e" stroke-width="3"/>
+<text x="968" y="334" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Analytics</text>
+<text x="968" y="368" font-family="Arial" font-size="17" fill="#1e293b">Understanding</text>
+<text x="968" y="393" font-family="Arial" font-size="17" fill="#1e293b">Auto analysis</text>
+<text x="968" y="418" font-family="Arial" font-size="17" fill="#1e293b">Profiler / charts</text>
+<line x1="800" y1="200" x2="1072" y2="300" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="1245" y="300" width="245" height="180" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="1263" y="334" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Safe tools</text>
+<text x="1263" y="368" font-family="Arial" font-size="17" fill="#1e293b">DuckDB</text>
+<text x="1263" y="393" font-family="Arial" font-size="17" fill="#1e293b">Pandas AST</text>
+<text x="1263" y="418" font-family="Arial" font-size="17" fill="#1e293b">Anomalies</text>
+<line x1="800" y1="200" x2="1367" y2="300" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="360" y="620" width="880" height="120" rx="14" fill="#fefce8" stroke="#b45309" stroke-width="3"/>
+<text x="378" y="654" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Verification stream</text>
+<text x="378" y="688" font-family="Arial" font-size="17" fill="#1e293b">Pytest unit/regression tests · HTTP route tests · persistence isolation · Next.js production build</text>
+<line x1="800" y1="480" x2="800" y2="620" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="800" y="542" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">cross-cutting evidence</text>
+</svg>

@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, use, useEffect, useRef, useState } from 'react';
 import { api } from '@/services/api';
 import { Analysis } from '@/types';
+import { useAuth } from '@/store/useAuth';
 
 const Chart = dynamic(() => import('@/components/Chart'), { ssr: false });
 
@@ -69,7 +70,8 @@ const SUGGESTIONS = [
 
 function AnalysePageContent({ id }: { id: string }) {
   const searchParams = useSearchParams();
-  const { data: datasets, isLoading: datasetsLoading } = useQuery({ queryKey: ['datasets'], queryFn: api.datasets });
+  const { user } = useAuth();
+  const { data: datasets, isLoading: datasetsLoading } = useQuery({ queryKey: ['datasets', user?.id], queryFn: api.datasets, enabled: !!user });
 
   const dataset = datasets?.find((d) => d.id === id);
   const [question, setQuestion] = useState(searchParams?.get('q') ?? '');
@@ -82,12 +84,20 @@ function AnalysePageContent({ id }: { id: string }) {
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
   // Deterministic session ID for this dataset (persists across visits/reloads)
-  const sessionId = `session-${id}`;
+  const sessionStorageKey = `insightforge_chat_session_${id}`;
+  const [sessionId, setSessionId] = useState<string>('');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Load chat history from backend (Redis / DB) on mount
+  useEffect(() => {
+    const existing = window.sessionStorage.getItem(sessionStorageKey);
+    const value = existing || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `session-${id}-${Date.now()}`);
+    window.sessionStorage.setItem(sessionStorageKey, value);
+    setSessionId(value);
+  }, [id, sessionStorageKey]);
+
   useEffect(() => {
     if (!sessionId) return;
     let isMounted = true;
@@ -136,7 +146,7 @@ function AnalysePageContent({ id }: { id: string }) {
 
   async function send(queryText?: string) {
     const promptToSend = queryText || question;
-    if (!promptToSend.trim() || loading) return;
+    if (!promptToSend.trim() || loading || !sessionId) return;
     const q = promptToSend.trim();
     setMessages((m) => [...m, { role: 'user', content: q }]);
     setQuestion('');

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<text x="55" y="48" font-family="Arial" font-size="27" font-weight="700" fill="#17324d">Automatic-analysis pipeline</text>
+<text x="55" y="76" font-family="Arial" font-size="16" fill="#475569">The deterministic report is the source of truth; provider-use flags remain false in the current engine.</text>
+<rect x="60" y="330" width="220" height="145" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="78" y="364" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Uploaded frame</text>
+<text x="78" y="398" font-family="Arial" font-size="17" fill="#1e293b">validated DataFrame</text>
+<rect x="380" y="285" width="250" height="235" rx="14" fill="#e8f1f8" stroke="#17324d" stroke-width="3"/>
+<text x="398" y="319" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">DataUnderstandingEngine</text>
+<text x="398" y="353" font-family="Arial" font-size="17" fill="#1e293b">domain / confidence</text>
+<text x="398" y="378" font-family="Arial" font-size="17" fill="#1e293b">grain / date</text>
+<text x="398" y="403" font-family="Arial" font-size="17" fill="#1e293b">dimensions</text>
+<text x="398" y="428" font-family="Arial" font-size="17" fill="#1e293b">measures / IDs</text>
+<rect x="730" y="285" width="250" height="235" rx="14" fill="#ecfdf5" stroke="#0f766e" stroke-width="3"/>
+<text x="748" y="319" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">StatisticalPass</text>
+<text x="748" y="353" font-family="Arial" font-size="17" fill="#1e293b">quality score</text>
+<text x="748" y="378" font-family="Arial" font-size="17" fill="#1e293b">aggregations</text>
+<text x="748" y="403" font-family="Arial" font-size="17" fill="#1e293b">periods</text>
+<text x="748" y="428" font-family="Arial" font-size="17" fill="#1e293b">chart specs</text>
+<rect x="1080" y="285" width="250" height="235" rx="14" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
+<text x="1098" y="319" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">DeterministicFallback</text>
+<text x="1098" y="353" font-family="Arial" font-size="17" fill="#1e293b">summary</text>
+<text x="1098" y="378" font-family="Arial" font-size="17" fill="#1e293b">insight cards</text>
+<text x="1098" y="403" font-family="Arial" font-size="17" fill="#1e293b">recommendations</text>
+<text x="1098" y="428" font-family="Arial" font-size="17" fill="#1e293b">actions</text>
+<rect x="1390" y="330" width="155" height="145" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="1408" y="364" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Persist</text>
+<text x="1408" y="398" font-family="Arial" font-size="17" fill="#1e293b">report_json</text>
+<text x="1408" y="423" font-family="Arial" font-size="17" fill="#1e293b">status</text>
+<line x1="280" y1="402" x2="380" y2="402" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="630" y1="402" x2="730" y2="402" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="980" y1="402" x2="1080" y2="402" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1330" y1="402" x2="1390" y2="402" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="735" y="620" font-family="Arial" font-size="18" fill="#475569">Frontend renders executive summary, metrics, charts, warnings, evidence, and actions.</text>
+</svg>

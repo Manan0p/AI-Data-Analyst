@@ -1,5 +1,6 @@
 import hashlib
 import io
+import re
 import pandas as pd
 from fastapi import HTTPException, UploadFile
 from app.config import settings
@@ -14,7 +15,7 @@ class CsvIngestionService:
     def __init__(self, registry: DatasetRegistry):
         self.registry = registry
 
-    def ingest_bytes(self, filename: str, content: bytes, owner_id: str | None = None) -> Dataset:
+    def ingest_bytes(self, filename: str, content: bytes, owner_id: str | None = None, dataset_id: str | None = None) -> Dataset:
         if not filename or not filename.lower().endswith(".csv"):
             raise HTTPException(400, "Only CSV files are supported")
         if not content.strip():
@@ -45,21 +46,27 @@ class CsvIngestionService:
         if frame.columns.duplicated().any():
             raise HTTPException(400, f"Duplicate column names: {frame.columns[frame.columns.duplicated()].tolist()}")
 
-        # Auto-convert date columns to datetime objects for DuckDB SQL compatibility
+        # Auto-convert date columns to datetime objects for DuckDB SQL compatibility.
+        # Only parse object columns with a high success ratio; numeric IDs such as
+        # YEAR_ID and POSTAL_CODE must remain numeric measures/identifiers.
         for col in frame.columns:
             if frame[col].dtype == "object":
-                if any(term in str(col).lower() for term in ("date", "time", "year", "month", "day")):
+                if any(term in str(col).lower() for term in ("date", "time", "timestamp")):
                     try:
                         parsed = pd.to_datetime(frame[col], format="mixed", errors="coerce")
-                        if pd.api.types.is_datetime64_any_dtype(parsed):
+                        if len(parsed) and float(parsed.notna().mean()) >= 0.7:
                             frame[col] = parsed
                     except Exception:
                         pass
 
-        # Deterministic dataset ID generation from filename and content hash
-        # Guarantees 0 duplicate dataset cards and instant ID matching across serverless workers
-        seed = f"{filename}:{len(content)}:{content[:500]}".encode('utf-8')
-        dataset_id = hashlib.md5(seed).hexdigest()[:12]
+        # Owner-scoped full-content hash. This keeps serverless rehydration
+        # deterministic while preventing identical uploads from different users
+        # from overwriting one another.
+        owner_scope = owner_id or "anonymous"
+        seed = owner_scope.encode("utf-8") + b"\0" + filename.encode("utf-8") + b"\0" + content
+        if dataset_id is not None and not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", dataset_id):
+            raise HTTPException(400, "Invalid dataset identifier")
+        dataset_id = dataset_id or ("ds_" + hashlib.sha256(seed).hexdigest()[:16])
 
         dataset = Dataset(dataset_id, filename, frame, owner_id=owner_id)
         self.registry.add(dataset, owner_id=owner_id)
@@ -75,7 +82,10 @@ class CsvIngestionService:
             def _analysis_task():
                 AutoAnalysisEngine().run_and_persist(_did, _frame, owner_id=_oid)
 
-            job_manager.submit_job("auto_analysis", owner_id or "anon", _analysis_task)
+            job_id = job_manager.submit_job("auto_analysis", owner_id or "anon", _analysis_task)
+            job = job_manager.get_job(job_id)
+            if job is not None:
+                setattr(job, "dataset_id", dataset_id)
         except Exception as exc:
             # Never block ingestion because of analysis errors
             import logging
@@ -83,6 +93,6 @@ class CsvIngestionService:
 
         return dataset
 
-    async def ingest(self, upload: UploadFile, owner_id: str | None = None) -> Dataset:
+    async def ingest(self, upload: UploadFile, owner_id: str | None = None, dataset_id: str | None = None) -> Dataset:
         content = await upload.read()
-        return self.ingest_bytes(upload.filename or "upload.csv", content, owner_id=owner_id)
+        return self.ingest_bytes(upload.filename or "upload.csv", content, owner_id=owner_id, dataset_id=dataset_id)

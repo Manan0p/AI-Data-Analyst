@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.api.auth_routes import router as auth_router
@@ -20,6 +21,14 @@ logger = logging.getLogger(__name__)
 # Create database tables automatically (safe for serverless read-only environments)
 try:
     Base.metadata.create_all(bind=engine)
+    # Lightweight compatibility migration for existing local SQLite/early
+    # PostgreSQL databases. Full deployments should use Alembic, but an old
+    # local DB must not make chat fail merely because analysis_data was added.
+    inspector = inspect(engine)
+    chat_columns = {column["name"] for column in inspector.get_columns("chat_messages")}
+    if "analysis_data" not in chat_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE chat_messages ADD COLUMN analysis_data JSON"))
 except Exception as exc:
     logger.warning("Database schema initialization warning: %s", exc)
 

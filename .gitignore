@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.github/
+.opencode/
 .mypy_cache/
 .coverage
 htmlcov/
@@ -16,6 +18,7 @@ backend/.venv/
 .env.local
 .env.*.local
 *.env
+.env.docker
 backend/.env
 
 # Node.js & Next.js

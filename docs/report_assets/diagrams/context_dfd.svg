@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<text x="55" y="48" font-family="Arial" font-size="27" font-weight="700" fill="#17324d">Context-level data-flow diagram</text>
+<text x="55" y="76" font-family="Arial" font-size="16" fill="#475569">The browser communicates only through authenticated API contracts.</text>
+<rect x="65" y="320" width="245" height="155" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="83" y="354" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">User / analyst</text>
+<text x="83" y="388" font-family="Arial" font-size="17" fill="#1e293b">Upload CSV</text>
+<text x="83" y="413" font-family="Arial" font-size="17" fill="#1e293b">Ask questions</text>
+<text x="83" y="438" font-family="Arial" font-size="17" fill="#1e293b">Review evidence</text>
+<rect x="425" y="250" width="350" height="260" rx="14" fill="#e8f1f8" stroke="#17324d" stroke-width="3"/>
+<text x="443" y="284" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">InsightForge API</text>
+<text x="443" y="318" font-family="Arial" font-size="17" fill="#1e293b">Auth + owner checks</text>
+<text x="443" y="343" font-family="Arial" font-size="17" fill="#1e293b">Upload / chat / tools</text>
+<text x="443" y="368" font-family="Arial" font-size="17" fill="#1e293b">Jobs + insight routes</text>
+<rect x="945" y="130" width="260" height="155" rx="14" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
+<text x="963" y="164" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Dataset store</text>
+<text x="963" y="198" font-family="Arial" font-size="17" fill="#1e293b">Registry</text>
+<text x="963" y="223" font-family="Arial" font-size="17" fill="#1e293b">CSV file</text>
+<text x="963" y="248" font-family="Arial" font-size="17" fill="#1e293b">Schema metadata</text>
+<rect x="945" y="365" width="260" height="155" rx="14" fill="#ecfdf5" stroke="#0f766e" stroke-width="3"/>
+<text x="963" y="399" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Analysis services</text>
+<text x="963" y="433" font-family="Arial" font-size="17" fill="#1e293b">Profile</text>
+<text x="963" y="458" font-family="Arial" font-size="17" fill="#1e293b">Semantic model</text>
+<text x="963" y="483" font-family="Arial" font-size="17" fill="#1e293b">Charts / anomaly</text>
+<rect x="945" y="600" width="260" height="155" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="963" y="634" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Memory + reports</text>
+<text x="963" y="668" font-family="Arial" font-size="17" fill="#1e293b">Sessions / messages</text>
+<text x="963" y="693" font-family="Arial" font-size="17" fill="#1e293b">Auto-analysis JSON</text>
+<rect x="1300" y="330" width="235" height="190" rx="14" fill="#fefce8" stroke="#b45309" stroke-width="3"/>
+<text x="1318" y="364" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Optional adapters</text>
+<text x="1318" y="398" font-family="Arial" font-size="17" fill="#1e293b">Gemini</text>
+<text x="1318" y="423" font-family="Arial" font-size="17" fill="#1e293b">Upstash Redis</text>
+<text x="1318" y="448" font-family="Arial" font-size="17" fill="#1e293b">Upstash Vector</text>
+<line x1="310" y1="395" x2="425" y2="395" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="367" y="387" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">HTTPS / bearer token</text>
+<line x1="775" y1="315" x2="945" y2="205" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="860" y="252" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">validated data</text>
+<line x1="775" y1="390" x2="945" y2="440" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="860" y="407" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">typed request</text>
+<line x1="775" y1="455" x2="945" y2="680" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="860" y="559" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">history / report</text>
+<line x1="1205" y1="440" x2="1300" y2="425" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)" stroke-dasharray="9 7"/>
+<text x="1252" y="424" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">optional</text>
+</svg>

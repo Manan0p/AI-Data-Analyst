@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<text x="55" y="48" font-family="Arial" font-size="27" font-weight="700" fill="#17324d">API route and authentication boundary</text>
+<text x="55" y="76" font-family="Arial" font-size="16" fill="#475569">Every protected route passes through identity validation, owner lookup, and typed response handling.</text>
+<rect x="55" y="320" width="220" height="155" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="73" y="354" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Browser</text>
+<text x="73" y="388" font-family="Arial" font-size="17" fill="#1e293b">Bearer token</text>
+<text x="73" y="413" font-family="Arial" font-size="17" fill="#1e293b">JSON / multipart</text>
+<rect x="365" y="250" width="280" height="295" rx="14" fill="#e8f1f8" stroke="#17324d" stroke-width="3"/>
+<text x="383" y="284" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">FastAPI route</text>
+<text x="383" y="318" font-family="Arial" font-size="17" fill="#1e293b">parse request</text>
+<text x="383" y="343" font-family="Arial" font-size="17" fill="#1e293b">require_current_user</text>
+<text x="383" y="368" font-family="Arial" font-size="17" fill="#1e293b">rate limit</text>
+<text x="383" y="393" font-family="Arial" font-size="17" fill="#1e293b">get_dataset(owner_id)</text>
+<text x="383" y="418" font-family="Arial" font-size="17" fill="#1e293b">shape response</text>
+<rect x="760" y="155" width="260" height="150" rx="14" fill="#fefce8" stroke="#b45309" stroke-width="3"/>
+<text x="778" y="189" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Auth service</text>
+<text x="778" y="223" font-family="Arial" font-size="17" fill="#1e293b">JWT decode</text>
+<text x="778" y="248" font-family="Arial" font-size="17" fill="#1e293b">user lookup</text>
+<text x="778" y="273" font-family="Arial" font-size="17" fill="#1e293b">bcrypt login</text>
+<rect x="760" y="375" width="260" height="150" rx="14" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
+<text x="778" y="409" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Owner-scoped registry</text>
+<text x="778" y="443" font-family="Arial" font-size="17" fill="#1e293b">get / list / delete</text>
+<text x="778" y="468" font-family="Arial" font-size="17" fill="#1e293b">dataset_id + owner_id</text>
+<rect x="1160" y="270" width="320" height="220" rx="14" fill="#ecfdf5" stroke="#0f766e" stroke-width="3"/>
+<text x="1178" y="304" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">Domain services</text>
+<text x="1178" y="338" font-family="Arial" font-size="17" fill="#1e293b">planner / analytics</text>
+<text x="1178" y="363" font-family="Arial" font-size="17" fill="#1e293b">SQL / Pandas tools</text>
+<text x="1178" y="388" font-family="Arial" font-size="17" fill="#1e293b">jobs / reports</text>
+<text x="1178" y="413" font-family="Arial" font-size="17" fill="#1e293b">Pydantic contracts</text>
+<line x1="275" y1="397" x2="365" y2="397" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="320" y="389" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">request</text>
+<line x1="645" y1="335" x2="760" y2="230" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="702" y="274" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">identity</text>
+<line x1="645" y1="440" x2="760" y2="450" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="702" y="437" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">owner lookup</text>
+<line x1="1020" y1="450" x2="1160" y2="380" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="1090" y="407" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">authorized call</text>
+<line x1="1020" y1="230" x2="1160" y2="320" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="1090" y="267" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">valid user</text>
+<text x="365" y="650" font-family="Arial" font-size="18" fill="#475569">Unauthorized requests stop at the dependency; a missing or cross-owner dataset is returned as HTTP 404.</text>
+</svg>

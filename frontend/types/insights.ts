@@ -10,6 +10,9 @@ export interface InsightCard {
   type: InsightType;
   chart?: Record<string, unknown> | null;
   importance: number;
+  severity?: 'info' | 'positive' | 'warning' | 'critical';
+  evidence?: Record<string, unknown>;
+  recommendation?: string | null;
 }
 
 export interface NullColumnInfo {
@@ -24,6 +27,11 @@ export interface DataQualityReport {
   null_columns: NullColumnInfo[];
   healthy_columns: number;
   health_score: number;
+  warnings?: string[];
+  domain?: string;
+  domain_confidence?: number;
+  grain?: string;
+  date_column?: string | null;
 }
 
 export interface AutoAnalysisChart {
@@ -43,6 +51,11 @@ export interface AutoAnalysis {
   insights: InsightCard[];
   charts: AutoAnalysisChart[];
   recommendations: string[];
+  actions?: { priority: string; action: string }[];
+  key_metrics?: Record<string, unknown>;
+  domain?: string;
+  domain_confidence?: number;
+  grain?: string;
   data_quality: DataQualityReport;
   anomaly_note?: string | null;
   generated_at: string;

@@ -4,16 +4,19 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { use, useState } from 'react';
 import { api } from '@/services/api';
+import { useAuth } from '@/store/useAuth';
 
 export default function ExplorePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [search, setSearch] = useState('');
 
-  const { data: datasets } = useQuery({ queryKey: ['datasets'], queryFn: api.datasets });
-  const { data: profile } = useQuery({ queryKey: ['profile', id], queryFn: () => api.profile(id) });
+  const { user } = useAuth();
+  const { data: datasets } = useQuery({ queryKey: ['datasets', user?.id], queryFn: api.datasets, enabled: !!user });
+  const { data: profile } = useQuery({ queryKey: ['profile', user?.id, id], queryFn: () => api.profile(id), enabled: !!user });
   const { data: rowData, isFetching } = useQuery({
-    queryKey: ['rows', id, search],
+    queryKey: ['rows', user?.id, id, search],
     queryFn: () => api.rows(id, search),
+    enabled: !!user,
   });
 
   const dataset = datasets?.find((d) => d.id === id);

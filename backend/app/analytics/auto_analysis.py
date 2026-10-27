@@ -1,24 +1,13 @@
-"""
-auto_analysis.py — Automated Intelligence Engine (Dual-Model Parallel Architecture)
+"""Grounded, domain-aware automatic analysis.
 
-Pipeline:
-  1. StatisticalPass  — pure Pandas, ~100 ms, feeds both LLM prompts
-  2. asyncio.gather(
-       GeminiStructuredPass,   → insight_cards + chart_recommendations + anomaly_note
-       GroqNarrativePass,      → executive_summary + recommendations + trend_story
-     )
-  3. merge + persist to AutoAnalysisReportModel
-
-Graceful degradation tiers:
-  - GEMINI_API_KEY + GROQ_API_KEY  → full parallel dual-model
-  - GEMINI_API_KEY only             → Gemini handles both tasks sequentially
-  - neither key                     → deterministic rule-based report (instant)
+The deterministic pass is the source of truth. Optional LLM providers may be
+used later for wording, but they never choose business measures or invent the
+facts shown to the user. This keeps chat and auto-insights useful when Redis,
+Vector, Gemini, or Groq are unavailable.
 """
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 import math
 from datetime import datetime, timezone
@@ -26,550 +15,528 @@ from typing import Any
 
 import pandas as pd
 
-from app.config import settings
+from app.analytics.understanding import DataUnderstandingEngine, public_understanding
 from app.schemas.contracts import AutoAnalysisResponse, DataQualityReport, InsightCard
 
 logger = logging.getLogger(__name__)
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
-
 def _safe(value: Any) -> Any:
-    """Replace NaN/Inf with None for JSON serialisation."""
     if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
         return None
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except Exception:
+            pass
+    if hasattr(value, "isoformat"):
+        try:
+            return value.isoformat()
+        except Exception:
+            pass
     return value
 
 
-def _top_n(series: pd.Series, n: int = 10) -> list[dict]:
-    counts = series.value_counts().head(n)
+def _top_n(series: pd.Series, n: int = 10) -> list[dict[str, Any]]:
+    counts = series.value_counts(dropna=True).head(n)
     return [{"label": str(k), "value": int(v)} for k, v in counts.items()]
 
 
-# ── Step 1: Statistical Pass (pure Python, no LLM) ───────────────────────────
+def _fmt_number(value: Any, decimals: int = 2) -> str:
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return "n/a"
+    try:
+        return f"{float(value):,.{decimals}f}"
+    except Exception:
+        return str(value)
+
+
+def _fmt_money(value: Any) -> str:
+    if value is None:
+        return "n/a"
+    try:
+        return f"${float(value):,.2f}"
+    except Exception:
+        return str(value)
+
+
+def _fmt_pct(value: Any) -> str:
+    if value is None:
+        return "n/a"
+    try:
+        return f"{float(value) * 100:.1f}%"
+    except Exception:
+        return str(value)
+
+
+def _chart(title: str, chart_type: str, x: list[Any], y: list[Any], name: str) -> dict[str, Any]:
+    trace: dict[str, Any] = {"type": chart_type, "x": [_safe(v) for v in x], "name": name}
+    if chart_type not in {"pie", "histogram"}:
+        trace["y"] = [_safe(v) for v in y]
+    elif chart_type == "pie":
+        trace = {"type": "pie", "labels": [_safe(v) for v in x], "values": [_safe(v) for v in y], "name": name}
+    else:
+        trace = {"type": "histogram", "x": [_safe(v) for v in y], "name": name}
+    return {
+        "title": title,
+        "data": [trace],
+        "layout": {
+            "title": title,
+            "paper_bgcolor": "transparent",
+            "plot_bgcolor": "transparent",
+        },
+    }
+
+
+def _metric(frame: pd.DataFrame, column: str | None, operation: str = "sum") -> float | None:
+    if not column or column not in frame.columns:
+        return None
+    series = pd.to_numeric(frame[column], errors="coerce").dropna()
+    if series.empty:
+        return None
+    if operation == "mean":
+        return float(series.mean())
+    if operation == "min":
+        return float(series.min())
+    if operation == "max":
+        return float(series.max())
+    return float(series.sum())
+
+
+def _aggregate(frame: pd.DataFrame, dimension: str | None, measure: str | None) -> pd.DataFrame:
+    if not dimension or not measure or dimension not in frame.columns or measure not in frame.columns:
+        return pd.DataFrame()
+    working = frame[[dimension, measure]].copy()
+    working[measure] = pd.to_numeric(working[measure], errors="coerce")
+    working = working.dropna(subset=[dimension, measure])
+    if working.empty:
+        return pd.DataFrame()
+    return working.groupby(dimension, dropna=False)[measure].agg(["sum", "mean", "count"]).sort_values("sum", ascending=False)
+
+
+def _period_aggregate(frame: pd.DataFrame, date_col: str | None, measure: str | None) -> pd.DataFrame:
+    if not date_col or not measure or date_col not in frame.columns or measure not in frame.columns:
+        return pd.DataFrame()
+    working = frame[[date_col, measure]].copy()
+    working[date_col] = pd.to_datetime(working[date_col], errors="coerce")
+    working[measure] = pd.to_numeric(working[measure], errors="coerce")
+    working = working.dropna()
+    if working.empty:
+        return pd.DataFrame()
+    working["period"] = working[date_col].dt.to_period("M").astype(str)
+    return working.groupby("period")[measure].agg(["sum", "mean", "count"]).sort_index()
+
 
 class StatisticalPass:
-    """Derives charts, quality metrics and summary stats from raw DataFrame."""
+    """Derive semantic schema, quality, key metrics, and useful charts."""
 
     def run(self, dataset_id: str, frame: pd.DataFrame) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "charts": [],
-            "quality": {},
-            "stats": {},
-            "top_n": {},
-            "date_col": None,
-        }
+        understanding = DataUnderstandingEngine().run(frame)
+        working = understanding["frame"]
+        measures = understanding["measures"]
+        dimensions = understanding["dimensions"]
+        metric_columns = understanding["metric_columns"]
+        primary_measure = metric_columns.get("revenue") or metric_columns.get("primary")
+        date_col = understanding.get("date_column")
 
-        numeric_cols = frame.select_dtypes(include="number").columns.tolist()
-        categorical_cols = frame.select_dtypes(exclude="number").columns.tolist()
-        date_col: str | None = None
-
-        # ── detect date column ────────────────────────────────────────
-        for col in frame.columns:
-            if pd.api.types.is_datetime64_any_dtype(frame[col]):
-                date_col = col
-                break
-        if date_col is None:
-            for col in categorical_cols:
-                if any(t in col.lower() for t in ("date", "time", "year", "month")):
-                    try:
-                        parsed = pd.to_datetime(frame[col], errors="coerce")
-                        if parsed.notna().mean() > 0.7:
-                            frame = frame.copy()
-                            frame[col] = parsed
-                            date_col = col
-                            break
-                    except Exception:
-                        pass
-        result["date_col"] = date_col
-
-        # ── numeric summary ───────────────────────────────────────────
-        if numeric_cols:
-            desc = frame[numeric_cols].describe()
-            result["stats"] = {
-                col: {k: _safe(v) for k, v in desc[col].to_dict().items()}
-                for col in numeric_cols
+        stats: dict[str, dict[str, Any]] = {}
+        if measures:
+            desc = working[measures].describe()
+            stats = {
+                col: {key: _safe(value) for key, value in desc[col].to_dict().items()}
+                for col in measures
             }
 
-        # ── top-N breakdown per categorical column ────────────────────
-        for col in categorical_cols[:6]:
-            if frame[col].nunique() <= 50:
-                result["top_n"][col] = _top_n(frame[col])
+        top_n: dict[str, list[dict[str, Any]]] = {}
+        for col in dimensions[:8]:
+            if working[col].nunique(dropna=True) <= 100:
+                top_n[col] = _top_n(working[col], 10)
 
-        # ── auto charts ───────────────────────────────────────────────
-        charts = []
+        charts: list[dict[str, Any]] = []
+        primary_dimension = dimensions[0] if dimensions else None
+        grouped = _aggregate(working, primary_dimension, primary_measure)
+        if not grouped.empty:
+            charts.append(_chart(
+                f"{primary_measure} by {primary_dimension}",
+                "bar",
+                grouped.head(12).index.tolist(),
+                grouped.head(12)["sum"].tolist(),
+                primary_measure,
+            ))
 
-        # Chart 1: bar — top categorical × first numeric
-        if categorical_cols and numeric_cols:
-            cat = categorical_cols[0]
-            num = numeric_cols[0]
-            agg = (
-                frame.groupby(cat)[num].sum().sort_values(ascending=False).head(15)
-            )
-            if not agg.empty:
-                charts.append({
-                    "title": f"{num} by {cat}",
-                    "data": [{"type": "bar",
-                               "x": agg.index.astype(str).tolist(),
-                               "y": [_safe(v) for v in agg.values.tolist()],
-                               "name": num}],
-                    "layout": {"title": f"{num} by {cat}",
-                                "paper_bgcolor": "transparent",
-                                "plot_bgcolor": "transparent"},
-                })
+        periods = _period_aggregate(working, date_col, primary_measure)
+        if not periods.empty:
+            charts.append(_chart(
+                f"Monthly {primary_measure} trend",
+                "scatter",
+                periods.index.tolist(),
+                periods["sum"].tolist(),
+                primary_measure,
+            ))
 
-        # Chart 2: line — time series of first numeric col if date detected
-        if date_col and numeric_cols:
-            num = numeric_cols[0]
-            ts = frame[[date_col, num]].dropna()
-            if not ts.empty:
-                ts = ts.sort_values(date_col)
-                # Resample to monthly if > 60 data points
-                ts = ts.set_index(date_col)
-                if len(ts) > 60:
-                    ts = ts[num].resample("ME").sum().reset_index()
-                else:
-                    ts = ts.reset_index()
-                charts.append({
-                    "title": f"{num} over time",
-                    "data": [{"type": "scatter", "mode": "lines+markers",
-                               "x": ts[date_col].astype(str).tolist(),
-                               "y": [_safe(v) for v in ts[num].tolist()],
-                               "name": num}],
-                    "layout": {"title": f"{num} over time",
-                                "paper_bgcolor": "transparent",
-                                "plot_bgcolor": "transparent"},
-                })
+        if primary_measure and primary_measure in working.columns:
+            charts.append(_chart(
+                f"Distribution of {primary_measure}",
+                "histogram",
+                [],
+                pd.to_numeric(working[primary_measure], errors="coerce").dropna().head(2000).tolist(),
+                primary_measure,
+            ))
 
-        # Chart 3: histogram — distribution of first numeric column
-        if numeric_cols:
-            col = numeric_cols[0]
-            vals = frame[col].dropna().tolist()[:2000]
+        meaningful_numeric = [col for col in measures if col in working.columns]
+        if len(meaningful_numeric) >= 2:
+            corr = working[meaningful_numeric].corr().round(3)
             charts.append({
-                "title": f"Distribution of {col}",
-                "data": [{"type": "histogram", "x": vals}],
-                "layout": {"title": f"Distribution of {col}",
-                            "paper_bgcolor": "transparent",
-                            "plot_bgcolor": "transparent"},
+                "title": "Meaningful numeric correlations",
+                "data": [{
+                    "type": "heatmap",
+                    "z": corr.values.tolist(),
+                    "x": corr.columns.tolist(),
+                    "y": corr.index.tolist(),
+                    "colorscale": "RdBu",
+                }],
+                "layout": {"title": "Meaningful numeric correlations", "paper_bgcolor": "transparent", "plot_bgcolor": "transparent"},
             })
 
-        # Chart 4: pie — second categorical column share
-        if len(categorical_cols) > 1 and numeric_cols:
-            cat = categorical_cols[1]
-            num = numeric_cols[0]
-            if frame[cat].nunique() <= 12:
-                agg = frame.groupby(cat)[num].sum().sort_values(ascending=False)
-                charts.append({
-                    "title": f"{num} share by {cat}",
-                    "data": [{"type": "pie",
-                               "labels": agg.index.astype(str).tolist(),
-                               "values": [_safe(v) for v in agg.values.tolist()]}],
-                    "layout": {"title": f"{num} share by {cat}",
-                                "paper_bgcolor": "transparent",
-                                "plot_bgcolor": "transparent"},
-                })
+        null_columns = [
+            {"name": str(col), "null_pct": round(float(working[col].isna().mean() * 100), 2)}
+            for col in working.columns
+        ]
+        null_columns.sort(key=lambda item: item["null_pct"], reverse=True)
+        duplicate_rows = int(working.duplicated().sum())
+        warnings: list[str] = []
+        if duplicate_rows:
+            warnings.append(f"{duplicate_rows:,} duplicate rows detected.")
+        for item in null_columns:
+            if item["null_pct"] >= 5:
+                warnings.append(f"{item['name']} is {item['null_pct']:.1f}% null.")
+        if not date_col and understanding["domain"] in {"sales", "marketing", "finance", "operations"}:
+            warnings.append("No reliable date column was detected, so period trends are unavailable.")
 
-        # Chart 5: heatmap — correlation matrix (≥2 numeric cols)
-        if len(numeric_cols) >= 2:
-            corr = frame[numeric_cols].corr().round(3)
-            charts.append({
-                "title": "Correlation Heatmap",
-                "data": [{"type": "heatmap",
-                           "z": corr.values.tolist(),
-                           "x": corr.columns.tolist(),
-                           "y": corr.index.tolist(),
-                           "colorscale": "RdBu"}],
-                "layout": {"title": "Numeric Correlations",
-                            "paper_bgcolor": "transparent",
-                            "plot_bgcolor": "transparent"},
-            })
-
-        result["charts"] = charts
-
-        # ── data quality ──────────────────────────────────────────────
-        null_cols = []
-        healthy = 0
-        for col in frame.columns:
-            pct = round(float(frame[col].isna().mean() * 100), 2)
-            null_cols.append({"name": col, "null_pct": pct})
-            if pct < 5:
-                healthy += 1
-        null_cols.sort(key=lambda x: x["null_pct"], reverse=True)
-
-        total_cols = len(frame.columns)
-        duplicates = int(frame.duplicated().sum())
-        # health score: weighted by null %, duplicates, and empty cols
-        health = max(0.0, 100.0 - (sum(c["null_pct"] for c in null_cols) / max(total_cols, 1)) - min(duplicates / max(len(frame), 1) * 100, 20))
-
-        result["quality"] = DataQualityReport(
-            total_rows=len(frame),
+        total_cols = len(working.columns)
+        null_penalty = sum(item["null_pct"] for item in null_columns) / max(total_cols, 1)
+        duplicate_penalty = min(20.0, duplicate_rows / max(len(working), 1) * 100)
+        health_score = max(0.0, round(100.0 - null_penalty - duplicate_penalty, 1))
+        quality = DataQualityReport(
+            total_rows=len(working),
             total_columns=total_cols,
-            duplicate_rows=duplicates,
-            null_columns=null_cols,
-            healthy_columns=healthy,
-            health_score=round(health, 1),
+            duplicate_rows=duplicate_rows,
+            null_columns=null_columns,
+            healthy_columns=sum(1 for item in null_columns if item["null_pct"] < 5),
+            health_score=health_score,
+            warnings=warnings,
+            domain=understanding["domain"],
+            domain_confidence=understanding["domain_confidence"],
+            grain=understanding["grain"],
+            date_column=date_col,
         )
-        return result
+
+        key_metrics: dict[str, Any] = {
+            "rows": len(working),
+            "columns": len(working.columns),
+            "domain": understanding["domain"],
+            "grain": understanding["grain"],
+        }
+        if metric_columns.get("revenue"):
+            key_metrics["revenue"] = _metric(working, metric_columns["revenue"])
+        if metric_columns.get("profit"):
+            key_metrics["profit"] = _metric(working, metric_columns["profit"])
+        if metric_columns.get("quantity"):
+            key_metrics["quantity"] = _metric(working, metric_columns["quantity"])
+        if metric_columns.get("spend"):
+            key_metrics["spend"] = _metric(working, metric_columns["spend"])
+        if metric_columns.get("conversions"):
+            key_metrics["conversions"] = _metric(working, metric_columns["conversions"])
+
+        return {
+            "understanding": understanding,
+            "public_understanding": public_understanding(understanding),
+            "stats": stats,
+            "top_n": top_n,
+            "charts": charts,
+            "quality": quality,
+            "key_metrics": key_metrics,
+            "periods": periods,
+        }
 
 
-# ── Step 2a: Gemini Structured Pass ──────────────────────────────────────────
+class DeterministicFallback:
+    """Produce business findings without external services."""
 
-class GeminiStructuredPass:
-    """Uses Gemini Flash to produce typed insight_cards + chart_recommendations."""
-
-    def _build_stats_summary(self, stats: dict, top_n: dict) -> str:
-        lines = []
-        for col, s in list(stats.items())[:8]:
-            lines.append(f"  {col}: mean={s.get('mean')}, max={s.get('max')}, min={s.get('min')}, std={s.get('std')}")
-        for col, rows in list(top_n.items())[:4]:
-            top = rows[:5]
-            lines.append(f"  {col} top values: " + ", ".join(f"{r['label']}({r['value']})" for r in top))
-        return "\n".join(lines)
-
-    async def run(self, schema: list[dict], stats: dict, top_n: dict) -> dict:
-        if not settings.gemini_api_key:
-            return {}
-        try:
-            from google import genai
-            from google.genai import types
-
-            stats_text = self._build_stats_summary(stats, top_n)
-            prompt = (
-                "You are a data analyst. Based on the dataset schema and statistics below, "
-                "generate a JSON object with exactly these keys:\n"
-                "- insight_cards: array of 5-8 objects, each with: title (string), body (string, 1-2 sentences with specific numbers), "
-                "metric (string, the key number e.g. '42%'), type (one of: stat|trend|anomaly|distribution|correlation), importance (float 0-1)\n"
-                "- anomaly_note: string or null (brief note about any suspicious patterns)\n\n"
-                "Return ONLY valid JSON. Use actual column names and real numbers from the stats.\n\n"
-                f"Schema:\n{json.dumps(schema, indent=2)}\n\n"
-                f"Statistics:\n{stats_text}"
-            )
-
-            client = genai.Client(api_key=settings.gemini_api_key)
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: client.models.generate_content(
-                    model=settings.gemini_model,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.2,
-                    ),
-                ),
-            )
-            return json.loads(response.text)
-        except Exception as exc:
-            logger.warning("Gemini structured pass failed: %s", exc)
-            return {}
-
-
-# ── Step 2b: Groq Narrative Pass ─────────────────────────────────────────────
-
-class GroqNarrativePass:
-    """Uses Groq Llama 3.1 to write executive summary, trend story, and recommendations."""
-
-    async def run(self, schema: list[dict], stats: dict, top_n: dict, date_col: str | None) -> dict:
-        if not settings.groq_api_key:
-            return {}
-        try:
-            from groq import AsyncGroq
-
-            col_names = [c["name"] for c in schema[:12]]
-            num_rows = next((c for c in schema if c.get("rows")), {}).get("rows", "unknown")
-
-            stat_lines = []
-            for col, s in list(stats.items())[:6]:
-                stat_lines.append(f"  {col}: mean={s.get('mean')}, max={s.get('max')}")
-            for col, rows in list(top_n.items())[:3]:
-                top = rows[:3]
-                stat_lines.append(f"  {col} leaders: " + ", ".join(f"{r['label']}" for r in top))
-
-            time_hint = f" A date/time column '{date_col}' is present, so time-based trends are relevant." if date_col else ""
-
-            prompt = (
-                "You are a senior business data analyst writing an executive intelligence report. "
-                "Based on the dataset information below, generate a JSON object with:\n"
-                "- executive_summary: 2-3 sentences describing what this dataset is about and its most important finding\n"
-                "- trend_story: 1-2 sentences about trends or patterns observed (or null if no trends obvious)\n"
-                "- recommendations: array of exactly 4 specific, insightful questions an analyst should explore next\n\n"
-                "Be specific, use actual column names and numbers. Be professional but concise.\n"
-                f"Columns: {col_names}\n"
-                f"Statistics:\n" + "\n".join(stat_lines) +
-                f"\n{time_hint}\n\n"
-                "Return ONLY valid JSON."
-            )
-
-            client = AsyncGroq(api_key=settings.groq_api_key)
-            response = await client.chat.completions.create(
-                model=settings.groq_model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-                response_format={"type": "json_object"},
-            )
-            text = response.choices[0].message.content or "{}"
-            return json.loads(text)
-        except Exception as exc:
-            logger.warning("Groq narrative pass failed: %s", exc)
-            return {}
-
-
-# ── Step 3: Deterministic Fallback (no LLM) ──────────────────────────────────
-
-class DeterministicNarrative:
-    """Rule-based narrative when no LLM keys are configured."""
-
-    def build(self, frame: pd.DataFrame, stats: dict, top_n: dict, quality: DataQualityReport) -> dict:
-        numeric_cols = frame.select_dtypes(include="number").columns.tolist()
-        categorical_cols = frame.select_dtypes(exclude="number").columns.tolist()
-
-        # Executive summary
+    def build(
+        self,
+        frame: pd.DataFrame,
+        stats: dict[str, dict[str, Any]],
+        top_n: dict[str, list[dict[str, Any]]],
+        quality: DataQualityReport,
+        understanding: dict[str, Any] | None = None,
+        periods: pd.DataFrame | None = None,
+        charts: list[dict[str, Any]] | None = None,
+        key_metrics: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        understanding = understanding or DataUnderstandingEngine().run(frame)
+        metric_columns = understanding["metric_columns"]
+        domain = understanding["domain"]
+        dimensions = understanding["dimensions"]
+        revenue_col = metric_columns.get("revenue")
+        profit_col = metric_columns.get("profit")
+        primary_dimension = dimensions[0] if dimensions else None
+        cards: list[dict[str, Any]] = []
+        recommendations: list[str] = []
+        actions: list[dict[str, Any]] = []
         summary_parts = [
-            f"This dataset contains {quality.total_rows:,} rows and {quality.total_columns} columns "
-            f"with a data quality score of {quality.health_score:.0f}/100."
+            f"This is a {domain} dataset with {quality.total_rows:,} {understanding['grain']} records and {quality.total_columns} columns.",
         ]
-        if numeric_cols and stats:
-            top_col = max(stats, key=lambda c: stats[c].get("mean") or 0)
-            summary_parts.append(
-                f"The highest-average numeric column is '{top_col}' "
-                f"(mean: {stats[top_col].get('mean', 0):.2f}, max: {stats[top_col].get('max', 0):.2f})."
-            )
-        if categorical_cols and top_n:
-            first_cat = categorical_cols[0]
-            if first_cat in top_n and top_n[first_cat]:
-                leader = top_n[first_cat][0]
-                summary_parts.append(
-                    f"The most frequent '{first_cat}' is '{leader['label']}' with {leader['value']:,} occurrences."
-                )
 
-        # Insight cards
-        cards: list[dict] = []
-        for col in numeric_cols[:4]:
-            s = stats.get(col, {})
-            if s.get("mean") is not None:
+        if domain == "sales" and revenue_col:
+            total_revenue = _metric(frame, revenue_col)
+            summary_parts.append(f"Total {revenue_col} is {_fmt_money(total_revenue)}.")
+            if profit_col:
+                total_profit = _metric(frame, profit_col)
+                margin = total_profit / total_revenue if total_profit is not None and total_revenue else None
+                summary_parts.append(f"Total {profit_col} is {_fmt_money(total_profit)} ({_fmt_pct(margin)} margin).")
+
+            grouped = _aggregate(frame, primary_dimension, revenue_col)
+            if not grouped.empty:
+                leader = grouped.iloc[0]
+                label = str(grouped.index[0])
                 cards.append({
-                    "title": f"{col} Statistics",
-                    "body": f"Mean: {s['mean']:.2f}, Max: {s.get('max', 'N/A')}, Min: {s.get('min', 'N/A')}",
-                    "metric": f"{s['mean']:.2f}",
-                    "type": "stat",
-                    "importance": 0.7,
+                    "title": f"Top {primary_dimension} by {revenue_col}",
+                    "body": f"{label} leads {revenue_col} with {_fmt_money(leader['sum'])} across {int(leader['count']):,} records.",
+                    "metric": _fmt_money(leader["sum"]), "type": "stat", "importance": 0.95,
+                    "severity": "positive", "evidence": {"dimension": primary_dimension, "label": label, "value": leader["sum"]},
                 })
+                recommendations.append(f"Protect and expand the {label} segment while checking whether its profit margin is also above average.")
 
-        for col, rows in list(top_n.items())[:2]:
-            if rows:
-                leader = rows[0]
+            category_dimension = next((col for col in dimensions if col.lower().strip() == "category"), None)
+            if category_dimension and category_dimension != primary_dimension:
+                category_grouped = _aggregate(frame, category_dimension, revenue_col)
+                if not category_grouped.empty:
+                    category_leader = str(category_grouped.index[0])
+                    cards.append({
+                        "title": f"Top category by {revenue_col}",
+                        "body": f"{category_leader} generated {_fmt_money(category_grouped.iloc[0]['sum'])} in {revenue_col}, the strongest category-level result.",
+                        "metric": _fmt_money(category_grouped.iloc[0]["sum"]), "type": "stat", "importance": 0.94,
+                        "severity": "positive", "evidence": {"dimension": category_dimension, "label": category_leader, "value": category_grouped.iloc[0]["sum"]},
+                    })
+
+            product_dimension = next((col for col in dimensions if "product" in col.lower()), None)
+            if product_dimension:
+                product_sales = _aggregate(frame, product_dimension, revenue_col)
+                if not product_sales.empty:
+                    top_product = str(product_sales.index[0])
+                    cards.append({
+                        "title": "Top product by sales",
+                        "body": f"{top_product} is the leading product by {revenue_col} at {_fmt_money(product_sales.iloc[0]['sum'])}.",
+                        "metric": _fmt_money(product_sales.iloc[0]["sum"]), "type": "distribution", "importance": 0.91,
+                        "severity": "positive", "evidence": {"product": top_product, "sales": product_sales.iloc[0]["sum"]},
+                    })
+
+            if profit_col and primary_dimension:
+                profit_grouped = _aggregate(frame, primary_dimension, profit_col)
+                if not profit_grouped.empty:
+                    worst = profit_grouped.sort_values("sum").iloc[0]
+                    best = profit_grouped.sort_values("sum", ascending=False).iloc[0]
+                    worst_label = str(profit_grouped.sort_values("sum").index[0])
+                    best_label = str(profit_grouped.sort_values("sum", ascending=False).index[0])
+                    cards.append({
+                        "title": f"Profitability risk in {worst_label}",
+                        "body": f"{worst_label} has the lowest total {profit_col} at {_fmt_money(worst['sum'])}; {best_label} leads at {_fmt_money(best['sum'])}.",
+                        "metric": _fmt_money(worst["sum"]), "type": "anomaly", "importance": 0.93,
+                        "severity": "critical" if float(worst["sum"]) < 0 else "warning",
+                        "evidence": {"worst_segment": worst_label, "worst_profit": worst["sum"], "best_segment": best_label, "best_profit": best["sum"]},
+                        "recommendation": f"Review pricing, discounting, and product mix in {worst_label}.",
+                    })
+                    if float(worst["sum"]) < 0:
+                        recommendations.append(f"Review pricing and discounting in {worst_label}, which is loss-making on aggregate.")
+
+            if profit_col and product_dimension:
+                product_profit = _aggregate(frame, product_dimension, profit_col)
+                if not product_profit.empty:
+                    worst_product = str(product_profit.sort_values("sum").index[0])
+                    worst_value = product_profit.sort_values("sum").iloc[0]["sum"]
+                    cards.append({
+                        "title": "Worst product by profit",
+                        "body": f"{worst_product} lost {_fmt_money(worst_value)} in aggregate profit and should be reviewed before further promotion.",
+                        "metric": _fmt_money(worst_value), "type": "anomaly", "importance": 0.96,
+                        "severity": "critical" if float(worst_value) < 0 else "warning",
+                        "evidence": {"product": worst_product, "profit": worst_value},
+                        "recommendation": f"Inspect price, discount, and return patterns for {worst_product}.",
+                    })
+                    recommendations.append(f"Inspect price, discount, and return patterns for {worst_product} before promoting it further.")
+
+            if periods is not None and not periods.empty:
+                peak_period = periods["sum"].idxmax()
+                worst_period = periods["sum"].idxmin()
+                peak_value = periods.loc[peak_period, "sum"]
+                worst_value = periods.loc[worst_period, "sum"]
                 cards.append({
-                    "title": f"Top {col}",
-                    "body": f"'{leader['label']}' leads with {leader['value']:,} occurrences in the '{col}' column.",
-                    "metric": str(leader["value"]),
-                    "type": "distribution",
-                    "importance": 0.6,
+                    "title": "Peak and weakest sales periods",
+                    "body": f"Peak {revenue_col} was {_fmt_money(peak_value)} in {peak_period}; the weakest period was {worst_period} at {_fmt_money(worst_value)}.",
+                    "metric": str(peak_period), "type": "trend", "importance": 0.9,
+                    "severity": "positive", "evidence": {"peak_period": peak_period, "peak_value": peak_value, "worst_period": worst_period, "worst_value": worst_value},
                 })
+                recommendations.append(f"Compare product mix and discounting between {peak_period} and {worst_period} before planning promotions.")
 
-        if quality.duplicate_rows > 0:
+            discount_col = metric_columns.get("discount")
+            if discount_col and profit_col:
+                pair = frame[[discount_col, profit_col]].apply(pd.to_numeric, errors="coerce").dropna()
+                if len(pair) >= 3:
+                    corr = float(pair[discount_col].corr(pair[profit_col]))
+                    if corr < -0.1:
+                        cards.append({
+                            "title": "Discount and profit move in opposite directions",
+                            "body": f"The observed correlation between {discount_col} and {profit_col} is {corr:.2f}. This is an association, not proof of causation.",
+                            "metric": f"r={corr:.2f}", "type": "correlation", "importance": 0.84,
+                            "severity": "warning", "evidence": {"correlation": corr, "rows": len(pair)},
+                            "recommendation": "Review high-discount transactions by product and region before increasing discount levels.",
+                        })
+                        recommendations.append("Review high-discount transactions by product and region; the negative association with profit warrants investigation.")
+
+        elif domain == "marketing":
+            spend_col = metric_columns.get("spend")
+            impressions_col = metric_columns.get("impressions")
+            clicks_col = metric_columns.get("clicks")
+            conversions_col = metric_columns.get("conversions")
+            if spend_col and clicks_col:
+                total_spend = _metric(frame, spend_col)
+                total_clicks = _metric(frame, clicks_col)
+                cpc = total_spend / total_clicks if total_spend is not None and total_clicks else None
+                summary_parts.append(f"Total spend is {_fmt_money(_metric(frame, spend_col))} with blended CPC {_fmt_money(cpc)}.")
+            if impressions_col and clicks_col:
+                total_clicks = _metric(frame, clicks_col)
+                total_impressions = _metric(frame, impressions_col)
+                ctr = total_clicks / total_impressions if total_clicks is not None and total_impressions else None
+                cards.append({"title": "Click-through rate", "body": f"Blended CTR is {_fmt_pct(ctr)} based on clicks divided by impressions.", "metric": _fmt_pct(ctr), "type": "stat", "importance": 0.9, "severity": "info", "evidence": {"ctr": ctr}})
+            if clicks_col and conversions_col:
+                total_conversions = _metric(frame, conversions_col)
+                total_clicks = _metric(frame, clicks_col)
+                cvr = total_conversions / total_clicks if total_conversions is not None and total_clicks else None
+                cards.append({"title": "Conversion efficiency", "body": f"Blended conversion rate is {_fmt_pct(cvr)} based on conversions divided by clicks.", "metric": _fmt_pct(cvr), "type": "trend", "importance": 0.88, "severity": "info", "evidence": {"conversion_rate": cvr}})
+            channel = next((col for col in dimensions if "channel" in col.lower() or "campaign" in col.lower()), primary_dimension)
+            if channel and spend_col and conversions_col:
+                grouped = frame.copy()
+                grouped[spend_col] = pd.to_numeric(grouped[spend_col], errors="coerce")
+                grouped[conversions_col] = pd.to_numeric(grouped[conversions_col], errors="coerce")
+                grouped = grouped.dropna(subset=[channel, spend_col, conversions_col])
+                if not grouped.empty:
+                    by_channel = grouped.groupby(channel).agg(spend=(spend_col, "sum"), conversions=(conversions_col, "sum"))
+                    by_channel["cpa"] = by_channel["spend"] / by_channel["conversions"].replace(0, pd.NA)
+                    by_channel = by_channel.dropna(subset=["cpa"]).sort_values("cpa")
+                    if not by_channel.empty:
+                        best = str(by_channel.index[0])
+                        worst = str(by_channel.index[-1])
+                        cards.append({"title": f"Best and weakest {channel}", "body": f"{best} has the lowest CPA at {_fmt_money(by_channel.iloc[0]['cpa'])}; {worst} has the highest at {_fmt_money(by_channel.iloc[-1]['cpa'])}.", "metric": best, "type": "distribution", "importance": 0.92, "severity": "positive", "evidence": {"best": best, "worst": worst}})
+                        recommendations.append(f"Protect the {best} allocation and review the conversion economics of {worst} before adding budget.")
+        else:
+            if primary_dimension and understanding["metric_columns"].get("primary"):
+                measure = understanding["metric_columns"]["primary"]
+                grouped = _aggregate(frame, primary_dimension, measure)
+                if not grouped.empty:
+                    label = str(grouped.index[0])
+                    cards.append({"title": f"Largest {measure} segment", "body": f"{label} has the largest aggregate {measure} at {_fmt_number(grouped.iloc[0]['sum'])}.", "metric": _fmt_number(grouped.iloc[0]['sum']), "type": "stat", "importance": 0.8, "severity": "info", "evidence": {"dimension": primary_dimension, "label": label}})
+            recommendations.extend([
+                "Validate the detected dataset grain before making business decisions.",
+                "Investigate the highest-impact dimensions and compare their distributions over time if a date column is available.",
+            ])
+
+        if quality.warnings:
             cards.append({
-                "title": "Duplicate Rows Detected",
-                "body": f"{quality.duplicate_rows:,} duplicate rows found. Consider deduplication before analysis.",
-                "metric": str(quality.duplicate_rows),
-                "type": "anomaly",
-                "importance": 0.8,
+                "title": "Data quality limitations",
+                "body": " ".join(quality.warnings[:3]),
+                "metric": f"{len(quality.warnings)} warning(s)",
+                "type": "anomaly", "importance": 0.86, "severity": "warning",
+                "evidence": {"warnings": quality.warnings},
             })
 
-        # Recommendations
-        recommendations = [
-            f"Which {categorical_cols[0]} has the highest {numeric_cols[0]}?" if categorical_cols and numeric_cols else "What are the key trends in this dataset?",
-            f"What is the distribution of {numeric_cols[0]}?" if numeric_cols else "How are the categories distributed?",
-            "Are there any anomalies or outliers in the numeric columns?",
-            "How does data quality affect the reliability of insights?",
-        ]
+        if not cards:
+            cards.append({
+                "title": "Dataset overview",
+                "body": f"No domain-specific findings were strong enough to report. The dataset contains {quality.total_rows:,} records.",
+                "metric": f"{quality.total_rows:,}", "type": "stat", "importance": 0.5, "severity": "info",
+            })
 
         return {
             "executive_summary": " ".join(summary_parts),
-            "trend_story": None,
-            "insight_cards": cards,
-            "recommendations": recommendations,
-            "anomaly_note": f"{quality.duplicate_rows} duplicate rows may affect analysis." if quality.duplicate_rows > 0 else None,
+            "trend_story": cards[2]["body"] if len(cards) > 2 else None,
+            "insight_cards": cards[:8],
+            "recommendations": list(dict.fromkeys(recommendations))[:6],
+            "actions": [{"priority": "high" if card.get("severity") == "critical" else "medium", "action": card.get("recommendation") or rec} for card, rec in zip(cards, list(dict.fromkeys(recommendations)))] if recommendations else [],
+            "anomaly_note": next((card["body"] for card in cards if card.get("severity") in {"warning", "critical"}), None),
         }
 
 
-# ── Main Engine ───────────────────────────────────────────────────────────────
+# Backwards-compatible name used by earlier tests and callers.
+DeterministicNarrative = DeterministicFallback
+
 
 class AutoAnalysisEngine:
-    """Orchestrates the full dual-model parallel auto-analysis pipeline."""
-
     def __init__(self):
         self._stat = StatisticalPass()
-        self._gemini = GeminiStructuredPass()
-        self._groq = GroqNarrativePass()
-        self._fallback = DeterministicNarrative()
+        self._fallback = DeterministicFallback()
 
-    def _build_schema(self, frame: pd.DataFrame) -> list[dict]:
-        schema = []
-        for col in frame.columns:
-            dtype = str(frame[col].dtype)
-            schema.append({
-                "name": str(col),
-                "dtype": dtype,
-                "unique": int(frame[col].nunique()),
-                "null_pct": round(float(frame[col].isna().mean() * 100), 1),
-                "sample": frame[col].dropna().head(3).astype(str).tolist(),
-            })
-        return schema
-
-    def _merge_results(
-        self,
-        dataset_id: str,
-        stat_result: dict,
-        gemini_result: dict,
-        groq_result: dict,
-        fallback_result: dict | None,
-    ) -> AutoAnalysisResponse:
-        gemini_used = bool(gemini_result)
-        groq_used   = bool(groq_result)
-
-        # ── executive summary (Groq > Gemini > fallback) ─────────────
-        executive_summary = (
-            groq_result.get("executive_summary")
-            or fallback_result.get("executive_summary", "Dataset analysis complete.")  # type: ignore[union-attr]
+    def run(self, dataset_id: str, frame: pd.DataFrame, owner_id: str | None = None) -> AutoAnalysisResponse:
+        stat_result = self._stat.run(dataset_id, frame)
+        understanding = stat_result["understanding"]
+        fallback = self._fallback.build(
+            understanding["frame"],
+            stat_result["stats"],
+            stat_result["top_n"],
+            stat_result["quality"],
+            understanding=understanding,
+            periods=stat_result["periods"],
+            charts=stat_result["charts"],
+            key_metrics=stat_result["key_metrics"],
         )
-        trend_story = groq_result.get("trend_story") if groq_result else None
-
-        # ── recommendations (Groq > fallback) ────────────────────────
-        recommendations: list[str] = (
-            groq_result.get("recommendations")  # type: ignore[assignment]
-            or (fallback_result or {}).get("recommendations", [])
-        )
-
-        # ── anomaly note (Gemini > fallback) ─────────────────────────
-        anomaly_note = (
-            gemini_result.get("anomaly_note")
-            or (fallback_result or {}).get("anomaly_note")
-        )
-
-        # ── insight cards (Gemini > fallback) ────────────────────────
-        raw_cards: list[dict] = (
-            gemini_result.get("insight_cards")  # type: ignore[assignment]
-            or (fallback_result or {}).get("insight_cards", [])
-        )
-        insight_cards = []
-        for card in raw_cards:
-            try:
-                insight_cards.append(InsightCard(**{
-                    "title": card.get("title", ""),
-                    "body": card.get("body", ""),
-                    "metric": card.get("metric"),
-                    "type": card.get("type", "stat"),
-                    "chart": card.get("chart"),
-                    "importance": float(card.get("importance", 0.5)),
-                }))
-            except Exception:
-                pass
-        # Sort by importance descending
-        insight_cards.sort(key=lambda c: c.importance, reverse=True)
-
+        cards = [InsightCard(**card) for card in fallback["insight_cards"]]
         return AutoAnalysisResponse(
             dataset_id=dataset_id,
-            executive_summary=executive_summary,
-            trend_story=trend_story,
-            insights=insight_cards,
-            charts=stat_result.get("charts", []),
-            recommendations=recommendations if isinstance(recommendations, list) else [],
+            executive_summary=fallback["executive_summary"],
+            trend_story=fallback.get("trend_story"),
+            insights=cards,
+            charts=stat_result["charts"],
+            recommendations=fallback["recommendations"],
+            actions=fallback.get("actions", []),
+            key_metrics=stat_result["key_metrics"],
+            domain=understanding["domain"],
+            domain_confidence=understanding["domain_confidence"],
+            grain=understanding["grain"],
             data_quality=stat_result["quality"],
-            anomaly_note=anomaly_note,
+            anomaly_note=fallback.get("anomaly_note"),
             generated_at=datetime.now(timezone.utc).isoformat(),
-            gemini_used=gemini_used,
-            groq_used=groq_used,
+            gemini_used=False,
+            groq_used=False,
             status="completed",
         )
 
-    async def _run_async(self, frame: pd.DataFrame, schema: list[dict], stat_result: dict) -> tuple[dict, dict]:
-        """Fire both LLM passes concurrently."""
-        gemini_task = self._gemini.run(schema, stat_result.get("stats", {}), stat_result.get("top_n", {}))
-        groq_task   = self._groq.run(schema, stat_result.get("stats", {}), stat_result.get("top_n", {}), stat_result.get("date_col"))
-        return await asyncio.gather(gemini_task, groq_task)
-
-    def run(self, dataset_id: str, frame: pd.DataFrame, owner_id: str | None = None) -> AutoAnalysisResponse:
-        """Full pipeline: stat → parallel LLM → merge → return."""
-        logger.info("AutoAnalysisEngine: starting for dataset %s", dataset_id)
-
-        # Step 1: statistical pass (~100ms)
-        stat_result = self._stat.run(dataset_id, frame)
-
-        # Build schema for LLM prompts
-        schema = self._build_schema(frame)
-
-        # Step 2: parallel LLM calls
-        gemini_result: dict = {}
-        groq_result: dict = {}
-        if settings.gemini_api_key or settings.groq_api_key:
-            try:
-                try:
-                    loop = asyncio.get_running_loop()
-                    # If called from inside an event loop (unlikely in thread pool), use run_in_executor
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        future = pool.submit(asyncio.run, self._run_async(frame, schema, stat_result))
-                        gemini_result, groq_result = future.result()
-                except RuntimeError:
-                    # No running event loop — use asyncio.run directly
-                    gemini_result, groq_result = asyncio.run(self._run_async(frame, schema, stat_result))
-            except Exception as exc:
-                logger.warning("Parallel LLM pass failed, using deterministic fallback: %s", exc)
-
-        # Step 2 fallback: if both LLMs failed or no keys, use deterministic
-        fallback: dict | None = None
-        if not gemini_result and not groq_result:
-            quality = stat_result["quality"]
-            fallback = self._fallback.build(frame, stat_result.get("stats", {}), stat_result.get("top_n", {}), quality)
-        # If only one LLM failed, supplement with deterministic data
-        elif not groq_result:
-            quality = stat_result["quality"]
-            fallback = self._fallback.build(frame, stat_result.get("stats", {}), stat_result.get("top_n", {}), quality)
-        elif not gemini_result:
-            quality = stat_result["quality"]
-            fallback = self._fallback.build(frame, stat_result.get("stats", {}), stat_result.get("top_n", {}), quality)
-
-        # Step 3: merge
-        result = self._merge_results(dataset_id, stat_result, gemini_result, groq_result, fallback)
-        logger.info(
-            "AutoAnalysisEngine: completed for %s | gemini=%s groq=%s insights=%d charts=%d",
-            dataset_id, result.gemini_used, result.groq_used, len(result.insights), len(result.charts),
-        )
-        return result
-
     def run_and_persist(self, dataset_id: str, frame: pd.DataFrame, owner_id: str | None = None) -> AutoAnalysisResponse:
-        """Run analysis and cache result in PostgreSQL."""
         from app.database.connection import SessionLocal
         from app.database.models import AutoAnalysisReportModel
 
         report = self.run(dataset_id, frame, owner_id)
-
         db = SessionLocal()
         try:
             existing = db.query(AutoAnalysisReportModel).filter(
-                AutoAnalysisReportModel.dataset_id == dataset_id
+                AutoAnalysisReportModel.dataset_id == dataset_id,
+                AutoAnalysisReportModel.owner_id == owner_id,
             ).first()
-            report_dict = report.model_dump()
             if existing:
-                existing.report_json = report_dict
-                existing.gemini_used = str(report.gemini_used)
-                existing.groq_used   = str(report.groq_used)
-                existing.updated_at  = datetime.now(timezone.utc)
+                existing.report_json = report.model_dump()
+                existing.gemini_used = "false"
+                existing.groq_used = "false"
+                existing.updated_at = datetime.now(timezone.utc)
             else:
-                rec = AutoAnalysisReportModel(
+                db.add(AutoAnalysisReportModel(
                     dataset_id=dataset_id,
                     owner_id=owner_id,
-                    report_json=report_dict,
-                    gemini_used=str(report.gemini_used),
-                    groq_used=str(report.groq_used),
-                )
-                db.add(rec)
+                    report_json=report.model_dump(),
+                    gemini_used="false",
+                    groq_used="false",
+                ))
             db.commit()
-            logger.info("AutoAnalysisEngine: report persisted for dataset %s", dataset_id)
-        except Exception as exc:
+        except Exception:
             db.rollback()
-            logger.warning("AutoAnalysisEngine: failed to persist report: %s", exc)
+            logger.exception("Failed to persist auto-analysis report for %s", dataset_id)
         finally:
             db.close()
-
         return report

@@ -4,10 +4,12 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { UploadPanel } from '@/components/UploadPanel';
+import { useAuth } from '@/store/useAuth';
 
 export default function DatasetsPage() {
   const queryClient = useQueryClient();
-  const { data: datasets, isLoading } = useQuery({ queryKey: ['datasets'], queryFn: api.datasets });
+  const { user } = useAuth();
+  const { data: datasets, isLoading } = useQuery({ queryKey: ['datasets', user?.id], queryFn: api.datasets, enabled: !!user });
 
   async function handleDelete(id: string) {
     try {

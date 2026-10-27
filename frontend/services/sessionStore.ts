@@ -2,33 +2,40 @@ export interface SessionDataset {
   id: string;
   name: string;
   csvContent: string;
+  ownerId?: string;
+}
+
+function key(ownerId: string | undefined, id: string) {
+  return `ds_${ownerId || 'anonymous'}_${id}`;
 }
 
 export const sessionStore = {
-  save(ds: SessionDataset) {
+  save(ds: SessionDataset, ownerId?: string) {
     if (typeof window === 'undefined') return;
     try {
-      sessionStorage.setItem(`ds_${ds.id}`, JSON.stringify(ds));
+      const value = { ...ds, ownerId: ownerId || ds.ownerId };
+      sessionStorage.setItem(key(ownerId || ds.ownerId, ds.id), JSON.stringify(value));
     } catch {}
   },
 
-  get(id: string): SessionDataset | null {
+  get(id: string, ownerId?: string): SessionDataset | null {
     if (typeof window === 'undefined') return null;
     try {
-      const raw = sessionStorage.getItem(`ds_${id}`);
+      const raw = sessionStorage.getItem(key(ownerId, id));
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
   },
 
-  getAll(): SessionDataset[] {
+  getAll(ownerId?: string): SessionDataset[] {
     if (typeof window === 'undefined') return [];
     const list: SessionDataset[] = [];
     try {
       for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
-        if (key?.startsWith('ds_')) {
+        if (!key || !key.startsWith(`ds_${ownerId || 'anonymous'}_`)) continue;
+        if (key.startsWith('ds_')) {
           const raw = sessionStorage.getItem(key);
           if (raw) list.push(JSON.parse(raw));
         }
@@ -37,20 +44,20 @@ export const sessionStore = {
     return list;
   },
 
-  remove(id: string) {
+  remove(id: string, ownerId?: string) {
     if (typeof window === 'undefined') return;
     try {
-      sessionStorage.removeItem(`ds_${id}`);
+      sessionStorage.removeItem(key(ownerId, id));
     } catch {}
   },
 
-  clear() {
+  clear(ownerId?: string) {
     if (typeof window === 'undefined') return;
     try {
       const keys: string[] = [];
       for (let i = 0; i < sessionStorage.length; i++) {
         const k = sessionStorage.key(i);
-        if (k?.startsWith('ds_')) keys.push(k);
+        if (k?.startsWith(`ds_${ownerId || 'anonymous'}_`)) keys.push(k);
       }
       keys.forEach(k => sessionStorage.removeItem(k));
     } catch {}

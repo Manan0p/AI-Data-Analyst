@@ -19,18 +19,19 @@ from typing import Optional
 
 from app.database.connection import SessionLocal
 from app.database.models import ChatMessageModel, ChatSessionModel
+from sqlalchemy import inspect, text
 
 logger = logging.getLogger(__name__)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def _redis_key(session_id: str) -> str:
-    return f"chat:turns:{session_id}"
+def _redis_key(session_id: str, owner_id: str | None = None) -> str:
+    return f"chat:turns:{owner_id or 'anonymous'}:{session_id}"
 
-def _vector_namespace(session_id: str) -> str:
+def _vector_namespace(session_id: str, owner_id: str | None = None) -> str:
     """Upstash Vector uses a flat namespace; prefix with session id."""
-    return session_id
+    return f"{owner_id or 'anonymous'}:{session_id}"
 
 
 # ── ConversationMemory ────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ def _vector_namespace(session_id: str) -> str:
 class ConversationMemory:
     def __init__(self):
         # In-process fallback (used when Upstash is absent)
-        self._cache: dict[str, list[dict]] = defaultdict(list)
+        self._cache: dict[str, list[dict[str, object]]] = defaultdict(list)
 
     # ── private helpers ───────────────────────────────────────────────────────
 
@@ -54,6 +55,14 @@ class ConversationMemory:
         from app.config import settings
         return settings
 
+    @staticmethod
+    def _supports_analysis_data() -> bool:
+        try:
+            from app.database.connection import engine
+            return "analysis_data" in {column["name"] for column in inspect(engine).get_columns("chat_messages")}
+        except Exception:
+            return False
+
     # ── public API ────────────────────────────────────────────────────────────
 
     def add(
@@ -66,7 +75,7 @@ class ConversationMemory:
         analysis_data: dict | None = None,
     ) -> None:
         """Persist a chat turn across all three layers."""
-        turn = {"role": role, "content": content}
+        turn: dict[str, object] = {"role": role, "content": content}
         if analysis_data:
             turn["analysis"] = analysis_data
 
@@ -76,7 +85,8 @@ class ConversationMemory:
         db = SessionLocal()
         try:
             session_rec = db.query(ChatSessionModel).filter(
-                ChatSessionModel.id == session_id
+                ChatSessionModel.id == session_id,
+                ChatSessionModel.owner_id == owner_id,
             ).first()
             if not session_rec:
                 session_rec = ChatSessionModel(
@@ -87,12 +97,18 @@ class ConversationMemory:
                 db.add(session_rec)
                 db.flush()
 
-            db.add(ChatMessageModel(
-                session_id=session_id,
-                role=role,
-                content=content,
-                analysis_data=analysis_data
-            ))
+            if self._supports_analysis_data():
+                db.add(ChatMessageModel(
+                    session_id=session_id,
+                    role=role,
+                    content=content,
+                    analysis_data=analysis_data,
+                ))
+            else:
+                db.execute(text(
+                    "INSERT INTO chat_messages (session_id, role, content, created_at) "
+                    "VALUES (:session_id, :role, :content, CURRENT_TIMESTAMP)"
+                ), {"session_id": session_id, "role": role, "content": content})
             db.commit()
         except Exception as exc:
             db.rollback()
@@ -102,7 +118,8 @@ class ConversationMemory:
 
         # ── Layer 1: Upstash Redis List ───────────────────────────────────────
         redis = self._redis()
-        key = _redis_key(session_id)
+        cache_key = f"{owner_id or 'anonymous'}:{session_id}"
+        key = _redis_key(session_id, owner_id)
         if redis:
             try:
                 redis.rpush(key, json.dumps(turn))
@@ -113,8 +130,8 @@ class ConversationMemory:
                 logger.warning("Upstash Redis write failed: %s", exc)
         else:
             # In-process fallback
-            self._cache[session_id].append(turn)
-            self._cache[session_id] = self._cache[session_id][-cfg.chat_context_window:]
+            self._cache[cache_key].append(turn)
+            self._cache[cache_key] = self._cache[cache_key][-cfg.chat_context_window:]
 
         # ── Layer 2: Upstash Vector upsert ────────────────────────────────────
         vector_client = self._vector()
@@ -130,6 +147,7 @@ class ConversationMemory:
                             "vector": embedding,
                             "metadata": {
                                 "session_id": session_id,
+                                "owner_id": owner_id,
                                 "role": role,
                                 "content": content,
                             },
@@ -138,7 +156,7 @@ class ConversationMemory:
             except Exception as exc:
                 logger.warning("Upstash Vector upsert failed: %s", exc)
 
-    def get(self, session_id: str) -> list[dict]:
+    def get(self, session_id: str, owner_id: str | None = None, dataset_id: str | None = None) -> list[dict]:
         """Return recent turns for *session_id* (L1 → L3 fallback chain)."""
         cfg = self._settings()
         redis = self._redis()
@@ -146,36 +164,48 @@ class ConversationMemory:
         # ── L1: Try Upstash Redis ─────────────────────────────────────────────
         if redis:
             try:
-                raw = redis.lrange(_redis_key(session_id), 0, -1)
+                raw = redis.lrange(_redis_key(session_id, owner_id), 0, -1)
                 if raw:
                     return [json.loads(r) for r in raw]
             except Exception as exc:
                 logger.warning("Upstash Redis read failed: %s", exc)
 
         # ── In-process fallback ───────────────────────────────────────────────
-        if session_id in self._cache and self._cache[session_id]:
-            return self._cache[session_id]
+        cache_key = f"{owner_id or 'anonymous'}:{session_id}"
+        if cache_key in self._cache and self._cache[cache_key]:
+            return self._cache[cache_key]
 
         # ── L3: SQLite cold load ──────────────────────────────────────────────
         db = SessionLocal()
         try:
-            records = (
-                db.query(ChatMessageModel)
-                .filter(ChatMessageModel.session_id == session_id)
-                .order_by(ChatMessageModel.created_at.asc(), ChatMessageModel.id.asc())
-                .all()
-            )
             messages = []
-            for m in records[-cfg.chat_context_window:]:
-                item = {"role": m.role, "content": m.content}
-                if m.analysis_data:
-                    item["analysis"] = m.analysis_data
-                messages.append(item)
+            if self._supports_analysis_data():
+                records = (
+                    db.query(ChatMessageModel)
+                    .join(ChatSessionModel, ChatSessionModel.id == ChatMessageModel.session_id)
+                    .filter(ChatMessageModel.session_id == session_id, ChatSessionModel.owner_id == owner_id)
+                    .order_by(ChatMessageModel.created_at.asc(), ChatMessageModel.id.asc())
+                    .all()
+                )
+                for m in records[-cfg.chat_context_window:]:
+                    item = {"role": m.role, "content": m.content}
+                    if m.analysis_data:
+                        item["analysis"] = m.analysis_data
+                    messages.append(item)
+            else:
+                records = db.execute(text(
+                    "SELECT m.role, m.content FROM chat_messages m "
+                    "JOIN chat_sessions s ON s.id = m.session_id "
+                    "WHERE m.session_id = :session_id "
+                    "AND (s.owner_id = :owner_id OR (s.owner_id IS NULL AND :owner_id IS NULL)) "
+                    "ORDER BY m.created_at ASC, m.id ASC"
+                ), {"session_id": session_id, "owner_id": owner_id}).mappings().all()
+                messages = [{"role": row["role"], "content": row["content"]} for row in records[-cfg.chat_context_window:]]
 
             # Back-fill Redis so next request is fast
             if redis and messages:
                 try:
-                    key = _redis_key(session_id)
+                    key = _redis_key(session_id, owner_id)
                     for m in messages:
                         redis.rpush(key, json.dumps(m))
                     redis.ltrim(key, -cfg.chat_context_window, -1)
@@ -183,11 +213,11 @@ class ConversationMemory:
                 except Exception:
                     pass
 
-            self._cache[session_id] = messages
+            self._cache[cache_key] = messages
             return messages
         except Exception as exc:
             logger.warning("Failed to load chat history from DB: %s", exc)
-            return self._cache.get(session_id, [])
+            return self._cache.get(cache_key, [])
         finally:
             db.close()
 
@@ -196,6 +226,7 @@ class ConversationMemory:
         session_id: str,
         query: str,
         top_k: int | None = None,
+        owner_id: str | None = None,
     ) -> list[dict]:
         """
         Semantic RAG retrieval: return the *top_k* past turns most relevant
@@ -223,13 +254,13 @@ class ConversationMemory:
                 vector=query_embedding,
                 top_k=k,
                 include_metadata=True,
-                filter=f'session_id = "{session_id}"',
+                filter=f'session_id = "{session_id}" AND owner_id = "{owner_id}"',
             )
 
             relevant: list[dict] = []
             for r in results:
                 meta = r.metadata or {}
-                if meta.get("session_id") == session_id and meta.get("content"):
+                if meta.get("session_id") == session_id and meta.get("owner_id") == owner_id and meta.get("content"):
                     relevant.append({
                         "role": meta.get("role", "user"),
                         "content": meta["content"],
@@ -239,7 +270,7 @@ class ConversationMemory:
             logger.warning("Upstash Vector query failed: %s", exc)
             return []
 
-    def clear(self, session_id: str | None = None) -> None:
+    def clear(self, session_id: str | None = None, owner_id: str | None = None) -> None:
         """Clear chat history from all layers."""
         redis = self._redis()
         vector_client = self._vector()
@@ -248,13 +279,16 @@ class ConversationMemory:
         db = SessionLocal()
         try:
             if session_id:
-                db.query(ChatMessageModel).filter(
-                    ChatMessageModel.session_id == session_id
-                ).delete()
-                db.query(ChatSessionModel).filter(
-                    ChatSessionModel.id == session_id
-                ).delete()
-                self._cache.pop(session_id, None)
+                session_rec = db.query(ChatSessionModel).filter(
+                    ChatSessionModel.id == session_id,
+                    ChatSessionModel.owner_id == owner_id,
+                ).first()
+                if session_rec:
+                    db.query(ChatMessageModel).filter(
+                        ChatMessageModel.session_id == session_id,
+                    ).delete()
+                    db.delete(session_rec)
+                self._cache.pop(f"{owner_id or 'anonymous'}:{session_id}", None)
             else:
                 db.query(ChatMessageModel).delete()
                 db.query(ChatSessionModel).delete()
@@ -269,7 +303,7 @@ class ConversationMemory:
         # ── Layer 1: Upstash Redis ────────────────────────────────────────────
         if redis and session_id:
             try:
-                redis.delete(_redis_key(session_id))
+                redis.delete(_redis_key(session_id, owner_id))
             except Exception as exc:
                 logger.warning("Failed to delete Redis key: %s", exc)
 
@@ -278,7 +312,7 @@ class ConversationMemory:
         if vector_client and session_id:
             try:
                 # Delete all vectors for this session using metadata filter
-                vector_client.delete(filter=f'session_id = "{session_id}"')
+                vector_client.delete(filter=f'session_id = "{session_id}" AND owner_id = "{owner_id}"')
             except Exception as exc:
                 logger.warning("Failed to delete Upstash Vector namespace: %s", exc)
 

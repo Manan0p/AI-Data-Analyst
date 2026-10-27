@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<text x="55" y="48" font-family="Arial" font-size="27" font-weight="700" fill="#17324d">Agent and tool-execution flow</text>
+<text x="55" y="76" font-family="Arial" font-size="16" fill="#475569">LangGraph is used for generic requests; deterministic business-question handling runs before the generic fallback.</text>
+<rect x="55" y="345" width="210" height="125" rx="14" fill="#f1f5f9" stroke="#17324d" stroke-width="3"/>
+<text x="73" y="379" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">User message</text>
+<text x="73" y="413" font-family="Arial" font-size="17" fill="#1e293b">natural-language question</text>
+<rect x="345" y="300" width="220" height="180" rx="14" fill="#e8f1f8" stroke="#17324d" stroke-width="3"/>
+<text x="363" y="334" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">classify_intent</text>
+<text x="363" y="368" font-family="Arial" font-size="17" fill="#1e293b">visualization</text>
+<text x="363" y="393" font-family="Arial" font-size="17" fill="#1e293b">anomaly</text>
+<text x="363" y="418" font-family="Arial" font-size="17" fill="#1e293b">profile</text>
+<text x="363" y="443" font-family="Arial" font-size="17" fill="#1e293b">query</text>
+<rect x="645" y="300" width="230" height="180" rx="14" fill="#fefce8" stroke="#b45309" stroke-width="3"/>
+<text x="663" y="334" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">select_tool</text>
+<text x="663" y="368" font-family="Arial" font-size="17" fill="#1e293b">Gemini JSON plan</text>
+<text x="663" y="393" font-family="Arial" font-size="17" fill="#1e293b">or rule-based fallback</text>
+<rect x="955" y="300" width="230" height="180" rx="14" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
+<text x="973" y="334" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">execute_tool</text>
+<text x="973" y="368" font-family="Arial" font-size="17" fill="#1e293b">SQL / Pandas</text>
+<text x="973" y="393" font-family="Arial" font-size="17" fill="#1e293b">chart / profile</text>
+<text x="973" y="418" font-family="Arial" font-size="17" fill="#1e293b">anomaly</text>
+<rect x="1265" y="300" width="250" height="180" rx="14" fill="#ecfdf5" stroke="#0f766e" stroke-width="3"/>
+<text x="1283" y="334" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">validate_result</text>
+<text x="1283" y="368" font-family="Arial" font-size="17" fill="#1e293b">success?</text>
+<text x="1283" y="393" font-family="Arial" font-size="17" fill="#1e293b">retry &lt; 2?</text>
+<rect x="1020" y="625" width="225" height="125" rx="14" fill="#e8f1f8" stroke="#17324d" stroke-width="3"/>
+<text x="1038" y="659" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">synthesize_answer</text>
+<text x="1038" y="693" font-family="Arial" font-size="17" fill="#1e293b">AnalysisResponse</text>
+<text x="1038" y="718" font-family="Arial" font-size="17" fill="#1e293b">evidence + chart</text>
+<rect x="1320" y="625" width="225" height="125" rx="14" fill="#fff7ed" stroke="#b45309" stroke-width="3"/>
+<text x="1338" y="659" font-family="Arial" font-size="21" font-weight="700" fill="#17324d">fallback_deterministic</text>
+<text x="1338" y="693" font-family="Arial" font-size="17" fill="#1e293b">PlannerAgent</text>
+<text x="1338" y="718" font-family="Arial" font-size="17" fill="#1e293b">safe baseline</text>
+<line x1="265" y1="407" x2="345" y2="390" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="565" y1="390" x2="645" y2="390" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="875" y1="390" x2="955" y2="390" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1185" y1="390" x2="1265" y2="390" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1390" y1="480" x2="1130" y2="625" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="1260" y="544" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">success</text>
+<line x1="1510" y1="480" x2="1430" y2="625" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="1470" y="544" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">retries exhausted</text>
+<line x1="1265" y1="450" x2="875" y2="520" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)" stroke-dasharray="9 7"/>
+<text x="1070" y="477" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">error + retry</text>
+</svg>

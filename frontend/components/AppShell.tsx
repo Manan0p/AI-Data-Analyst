@@ -16,11 +16,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     authModalMode,
     closeAuthModal,
     setUser,
+    openAuthModal,
   } = useAuth();
 
   useEffect(() => {
     initAuth();
   }, [initAuth]);
+
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser(null);
+      openAuthModal('login');
+    };
+    window.addEventListener('insightforge-auth-expired', handleExpired);
+    return () => window.removeEventListener('insightforge-auth-expired', handleExpired);
+  }, [openAuthModal, setUser]);
 
   const isLanding = isInitialized && !user && pathname === '/';
 
@@ -34,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         isOpen={isAuthModalOpen}
         initialMode={authModalMode}
         onClose={closeAuthModal}
-        onSuccess={(newUser) => setUser(newUser)}
+        onSuccess={(newUser, token) => setUser(newUser, token)}
       />
     </div>
   );
